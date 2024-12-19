@@ -1,2 +1,3 @@
-# mussel-vm
+# Mussel VM
+
 The VM implementation of Mussel Lox.
