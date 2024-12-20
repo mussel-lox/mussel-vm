@@ -2,20 +2,30 @@ use anyhow::Result;
 use mussel_vm::bytecode::{Bytecode, BytecodeWriter, Constant, EmitBytecodeExt, OperationCode};
 use mussel_vm::vm::VirtualMachine;
 
-fn main() -> Result<()> {
-    let mut bytecode = Bytecode::new();
-    {
-        let mut writer = BytecodeWriter::new(&mut bytecode);
-        writer.emit(OperationCode::Constant)?;
-        writer.emit(0u16)?;
-        writer.emit(OperationCode::Constant)?;
-        writer.emit(1u16)?;
-        writer.emit(OperationCode::Add)?;
-        writer.emit(OperationCode::Return)?;
+macro_rules! bytecode {
+    (const [$($constant: expr), * $(,)?] $($code: expr); * $(;)?) => {
+        {
+            let mut bytecode = Bytecode::new();
+            let mut writer = BytecodeWriter::new(&mut bytecode);
+            $( writer.define($constant)?; )*
+            $( writer.emit($code)?; )*
+            bytecode
+        }
+    };
+}
 
-        writer.define(Constant::Number(114.0))?;
-        writer.define(Constant::Number(514.0))?;
-    }
+fn main() -> Result<()> {
+    let bytecode = bytecode! {
+        const [
+            Constant::Number(114.0),
+            Constant::Number(514.0),
+        ]
+
+        OperationCode::Constant; 0u16;
+        OperationCode::Constant; 1u16;
+        OperationCode::Add;
+        OperationCode::Return;
+    };
     let mut vm = VirtualMachine::new();
     vm.interpret(&bytecode)
 }
