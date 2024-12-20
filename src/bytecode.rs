@@ -1,7 +1,14 @@
-use anyhow::{bail, Result};
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::Cursor;
-use std::mem;
+use byteorder::LittleEndian;
+use std::hash::{Hash, Hasher};
+
+mod reader;
+mod writer;
+
+pub use reader::*;
+pub use writer::*;
+
+/// The endianness of bytecode. Used in [`BytecodeReader`] and [`BytecodeWriter`].
+pub type ENDIANNESS = LittleEndian;
 
 /// The operation codes.
 ///
@@ -10,7 +17,10 @@ use std::mem;
 /// source code level (e.g. control flows) are implemented by several kinds of jump instructions.
 #[repr(u8)]
 pub enum OperationCode {
+    /// Load a constant into the VM stack, with its index stored as `u16` following the operation
+    /// code.
     Constant,
+
     Add,
     Subtract,
     Multiply,
@@ -19,17 +29,6 @@ pub enum OperationCode {
 
     /// Guard variant to detect invalid operation codes.
     Impossible,
-}
-
-impl TryFrom<u8> for OperationCode {
-    type Error = anyhow::Error;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value >= OperationCode::Impossible as u8 {
-            bail!("invalid operation code {}", value);
-        }
-        Ok(unsafe { mem::transmute(value) })
-    }
 }
 
 /// The constants stored in a [`Bytecode`].
@@ -41,10 +40,32 @@ impl TryFrom<u8> for OperationCode {
 ///
 /// For now, only numbers (internally `f64`) and strings (internally [`String`]) are considered
 /// as constants.
+#[derive(Debug, Clone)]
 pub enum Constant {
     Number(f64),
     String(String),
 }
+
+impl Hash for Constant {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Constant::Number(n) => n.to_bits().hash(state),
+            Constant::String(s) => s.hash(state),
+        }
+    }
+}
+
+impl PartialEq for Constant {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Constant::Number(n1), Constant::Number(n2)) => (n1 - n2).abs() < f64::EPSILON,
+            (Constant::String(s1), Constant::String(s2)) => s1 == s2,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Constant {}
 
 /// The bytecode.
 ///
@@ -56,28 +77,11 @@ pub struct Bytecode {
     pub constants: Vec<Constant>,
 }
 
-macro_rules! extract_primitive_impl {
-    ($($operand: ty), *) => {
-        impl Bytecode {
-            paste::paste! {
-                $(
-                pub fn [<extract_ $operand>](&self, offset: usize) -> Result<($operand, usize)> {
-                    let operand_size = mem::size_of::<$operand>();
-                    if self.code.len() - offset <= operand_size {
-                        bail!(
-                            "operation code {} with insufficient operand size {}",
-                            self.code[offset],
-                            operand_size,
-                        );
-                    }
-                    let mut cursor = Cursor::new(&self.code[offset + 1 ..]);
-                    let operand = cursor.[<read_ $operand>]::<LittleEndian>()?;
-                    Ok((operand, operand_size))
-                }
-                )*
-            }
+impl Bytecode {
+    pub fn new() -> Self {
+        Self {
+            code: Vec::new(),
+            constants: Vec::new(),
         }
-    };
+    }
 }
-
-extract_primitive_impl!(u16);
