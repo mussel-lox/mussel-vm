@@ -13,6 +13,16 @@ pub enum Value {
     Nil,
 }
 
+impl From<Value> for bool {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::Boolean(b) => b,
+            Value::Nil => false,
+            _ => true,
+        }
+    }
+}
+
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {

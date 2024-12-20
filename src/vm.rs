@@ -34,14 +34,17 @@ impl VirtualMachine {
     pub fn interpret(&mut self, bytecode: &Bytecode) -> Result<()> {
         let mut reader = BytecodeReader::new(bytecode);
         macro_rules! arithmetic {
-            ($operator: tt) => {{
-                let left = self.pop()?;
+            ($operator: tt as $variant: ident) => {{
                 let right = self.pop()?;
+                let left = self.pop()?;
                 match (left, right) {
                     (Value::Number(left), Value::Number(right)) => {
-                        self.stack.push(Value::Number(left $operator right))?;
+                        self.stack.push(Value::$variant(left $operator right))?;
                     }
-                    _ => bail!("arithmetic {} can only be applied to numbers", stringify!($operator)),
+                    _ => bail!(
+                        "arithmetic operator `{}` can only be applied to numbers",
+                        stringify!($operator),
+                    ),
                 }
             }};
         }
@@ -56,14 +59,36 @@ impl VirtualMachine {
                         Constant::String(s) => self.push(Value::String(s))?,
                     }
                 }
-                OperationCode::Add => arithmetic!(+),
-                OperationCode::Subtract => arithmetic!(-),
-                OperationCode::Multiply => arithmetic!(*),
-                OperationCode::Divide => arithmetic!(/),
+                OperationCode::Nil => self.stack.push(Value::Nil)?,
+                OperationCode::True => self.stack.push(Value::Boolean(true))?,
+                OperationCode::False => self.stack.push(Value::Boolean(false))?,
+
+                OperationCode::Negate => match self.pop()? {
+                    Value::Number(n) => self.push(Value::Number(-n))?,
+                    _ => bail!("negate operator `-` can only be applied to numbers"),
+                },
+                OperationCode::Not => {
+                    let boolean: bool = self.pop()?.into();
+                    self.push(Value::Boolean(boolean))?;
+                }
+
+                OperationCode::Add => arithmetic!(+ as Number),
+                OperationCode::Subtract => arithmetic!(- as Number),
+                OperationCode::Multiply => arithmetic!(* as Number),
+                OperationCode::Divide => arithmetic!(/ as Number),
                 OperationCode::Return => {
                     println!("{:?}", self.pop()?);
                     break;
                 }
+
+                OperationCode::Equal => {
+                    let right = self.pop()?;
+                    let left = self.pop()?;
+                    self.push(Value::Boolean(left == right))?;
+                }
+                OperationCode::Greater => arithmetic!(> as Boolean),
+                OperationCode::Less => arithmetic!(< as Boolean),
+
                 OperationCode::Impossible => unreachable!(),
             }
         }

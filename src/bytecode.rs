@@ -24,12 +24,22 @@ pub enum OperationCode {
     /// Load a constant into the VM stack, with its index stored as `u16` following the operation
     /// code.
     Constant,
+    Nil,
+    True,
+    False,
+
+    Negate,
+    Not,
 
     Add,
     Subtract,
     Multiply,
     Divide,
     Return,
+
+    Equal,
+    Greater,
+    Less,
 
     /// Guard variant to detect invalid operation codes.
     Impossible,
