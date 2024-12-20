@@ -8,7 +8,7 @@ use std::ptr;
 ///
 /// Mussel VM is (at least, originally) designed for the Lox language, thus the Lox types are
 /// supported: numbers, strings, booleans, nil and object types.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     Boolean(bool),

@@ -14,6 +14,9 @@ pub type ENDIANNESS = LittleEndian;
 /// the future.
 pub type ConstantIndex = u16;
 
+/// The type of global states' (i.e. variables) index.
+pub type GlobalStateIndex = u16;
+
 /// The operation codes.
 ///
 /// Operation codes forms the virtual ISA, which is recognized by the virtual machine (VM). It's
@@ -21,7 +24,7 @@ pub type ConstantIndex = u16;
 /// source code level (e.g. control flows) are implemented by several kinds of jump instructions.
 #[repr(u8)]
 pub enum OperationCode {
-    /* Value operations */
+    /* Value loading */
     /// Load a constant into the VM stack, with its index stored as `u16` following the operation
     /// code.
     Constant,
@@ -44,6 +47,21 @@ pub enum OperationCode {
     Equal,
     Greater,
     Less,
+
+    /* Global states */
+    /// Pops the top element of the stack, and sets it as a global state (i.e. variable) with its
+    /// index in [`GlobalStateIndex`] type.
+    SetGlobal,
+    /// Gets the specified global variable, and push it into the stack. Same as the `SetGlobal`
+    /// operation code, this code is followed by a [`GlobalStateIndex`].
+    GetGlobal,
+
+    /* Local (Stack) states */
+    /// Simply pops and drops the top element of the stack.
+    Pop,
+
+    /* Intrinsic */
+    Print,
 
     /// Guard variant to detect invalid operation codes.
     Impossible,
@@ -93,13 +111,4 @@ impl Eq for Constant {}
 pub struct Bytecode {
     pub code: Vec<u8>,
     pub constants: Vec<Constant>,
-}
-
-impl Bytecode {
-    pub fn new() -> Self {
-        Self {
-            code: Vec::new(),
-            constants: Vec::new(),
-        }
-    }
 }

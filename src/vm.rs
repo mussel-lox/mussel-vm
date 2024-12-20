@@ -1,4 +1,6 @@
-use crate::bytecode::{Bytecode, BytecodeReader, Constant, FetchBytecodeExt, OperationCode};
+use crate::bytecode::{
+    Bytecode, BytecodeReader, Constant, FetchBytecodeExt, GlobalStateIndex, OperationCode,
+};
 use crate::gc::{Allocate, GarbageCollector};
 use crate::value::Value;
 use anyhow::{bail, Result};
@@ -12,6 +14,7 @@ pub const STACK_SIZE: usize = 1024;
 /// machine, Mussel VM maintains a stack data structure, and stores local variable and does
 /// expression evaluation on it.
 pub struct VirtualMachine {
+    globals: Vec<Value>,
     stack: Stack<Value, STACK_SIZE>,
     gc: GarbageCollector,
 }
@@ -20,6 +23,7 @@ impl VirtualMachine {
     /// Create a virtual machine.
     pub fn new() -> Self {
         Self {
+            globals: Vec::new(),
             stack: Stack::new(),
             gc: GarbageCollector::new(),
         }
@@ -29,6 +33,7 @@ impl VirtualMachine {
     ///
     /// Note that GC is not reset here, it's up to itself to collect garbage.
     pub fn reset(&mut self) {
+        self.globals.clear();
         self.stack.clear();
     }
 
@@ -44,7 +49,7 @@ impl VirtualMachine {
                 let left = self.pop()?;
                 match (left, right) {
                     (Value::Number(left), Value::Number(right)) => {
-                        self.stack.push(Value::$variant(left $operator right))?;
+                        self.push(Value::$variant(left $operator right))?;
                     }
                     _ => bail!(
                         "arithmetic operator `{}` can only be applied to numbers",
@@ -63,13 +68,13 @@ impl VirtualMachine {
                         Constant::Number(n) => self.push(Value::Number(n))?,
                         Constant::String(s) => {
                             let allocation = self.gc.allocate(s);
-                            self.stack.push(Value::String(allocation))?;
+                            self.push(Value::String(allocation))?;
                         }
                     }
                 }
-                OperationCode::Nil => self.stack.push(Value::Nil)?,
-                OperationCode::True => self.stack.push(Value::Boolean(true))?,
-                OperationCode::False => self.stack.push(Value::Boolean(false))?,
+                OperationCode::Nil => self.push(Value::Nil)?,
+                OperationCode::True => self.push(Value::Boolean(true))?,
+                OperationCode::False => self.push(Value::Boolean(false))?,
 
                 OperationCode::Negate => match self.pop()? {
                     Value::Number(n) => self.push(Value::Number(-n))?,
@@ -85,11 +90,11 @@ impl VirtualMachine {
                     let left = self.pop()?;
                     match (left, right) {
                         (Value::Number(left), Value::Number(right)) => {
-                            self.stack.push(Value::Number(left + right))?;
+                            self.push(Value::Number(left + right))?;
                         }
                         (Value::String(left), Value::String(right)) => {
                             let concat = self.gc.allocate(format!("{}{}", *left, *right));
-                            self.stack.push(Value::String(concat))?;
+                            self.push(Value::String(concat))?;
                         }
                         _ => bail!("add operator `+` can only be applied to numbers or strings"),
                     }
@@ -97,10 +102,7 @@ impl VirtualMachine {
                 OperationCode::Subtract => arithmetic!(- as Number),
                 OperationCode::Multiply => arithmetic!(* as Number),
                 OperationCode::Divide => arithmetic!(/ as Number),
-                OperationCode::Return => {
-                    println!("{}", self.pop()?);
-                    break;
-                }
+                OperationCode::Return => break,
 
                 OperationCode::Equal => {
                     let right = self.pop()?;
@@ -110,10 +112,36 @@ impl VirtualMachine {
                 OperationCode::Greater => arithmetic!(> as Boolean),
                 OperationCode::Less => arithmetic!(< as Boolean),
 
+                OperationCode::SetGlobal => {
+                    let index: GlobalStateIndex = reader.fetch()?;
+                    if index as usize >= self.globals.len() {
+                        self.globals.resize(index as usize + 1, Value::Nil);
+                    }
+                    self.globals[index as usize] = self.top()?;
+                }
+                OperationCode::GetGlobal => {
+                    let index: GlobalStateIndex = reader.fetch()?;
+                    if index as usize >= self.globals.len() {
+                        bail!("global index {} out of bounds", index);
+                    }
+                    self.push(self.globals[index as usize].clone())?
+                }
+
+                OperationCode::Pop => drop(self.pop()?),
+
+                OperationCode::Print => println!("{}", self.pop()?),
+
                 OperationCode::Impossible => unreachable!(),
             }
         }
         Ok(())
+    }
+
+    fn top(&self) -> Result<Value> {
+        match self.stack.tos() {
+            Some(v) => Ok(v.clone()),
+            None => bail!(StackError::Underflow),
+        }
     }
 
     /// Pops a [`Value`] from the stack.
@@ -123,7 +151,7 @@ impl VirtualMachine {
     /// reported immediately.
     fn pop(&mut self) -> Result<Value> {
         match self.stack.pop() {
-            Some(value) => Ok(value),
+            Some(v) => Ok(v),
             None => bail!(StackError::Underflow),
         }
     }

@@ -9,7 +9,10 @@ macro_rules! bytecode {
     (const [$($constant: expr), * $(,)?] $($code: expr); * $(;)?) => {{
         use $crate::bytecode::EmitBytecodeExt;
 
-        let mut bytecode = $crate::bytecode::Bytecode::new();
+        let mut bytecode = $crate::bytecode::Bytecode {
+            code: Vec::new(),
+            constants: Vec::new(),
+        };
         let mut writer = $crate::bytecode::BytecodeWriter::new(&mut bytecode);
         $( writer.define($constant)?; )*
         $( writer.emit($code)?; )*

@@ -169,7 +169,7 @@ macro_rules! register_allowed_types {
                 match self.kind() {
                     $(
                     AllocationKind::$variant => {
-                        std::mem::drop(Box::from_raw(self.cast::<$t>().0.as_mut()))
+                        drop(Box::from_raw(self.cast::<$t>().0.as_mut()))
                     }
                     )*
                 }
