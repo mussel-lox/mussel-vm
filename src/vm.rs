@@ -96,7 +96,7 @@ impl VirtualMachine {
                 OperationCode::Multiply => arithmetic!(* as Number),
                 OperationCode::Divide => arithmetic!(/ as Number),
                 OperationCode::Return => {
-                    println!("{:?}", self.pop()?);
+                    println!("{}", self.pop()?);
                     break;
                 }
 

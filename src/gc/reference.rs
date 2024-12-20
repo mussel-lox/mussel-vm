@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 use std::ptr;
 use std::ptr::NonNull;
@@ -55,10 +55,6 @@ impl<T> Reference<T> {
     pub unsafe fn cast<U>(self) -> Reference<U> {
         Reference(self.0.cast())
     }
-
-    pub fn typ(&self) -> AllocationType {
-        unsafe { self.0.as_ref().typ }
-    }
 }
 
 impl<T> Deref for Reference<T> {
@@ -90,12 +86,6 @@ impl<T, U> PartialEq<Reference<U>> for Reference<T> {
 }
 
 impl<T> Eq for Reference<T> {}
-
-impl<T: Display + AllowedAllocationType> Display for Reference<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.deref().fmt(f)
-    }
-}
 
 /// The helper trait to perform downcasting on a [`Reference`].
 ///
@@ -167,16 +157,6 @@ macro_rules! register_allowed_types {
                 match allocation.typ {
                     $(
                     AllocationType::$variant => self.0.cast::<RawAllocation<$t>>().drop_in_place(),
-                    )*
-                }
-            }
-        }
-
-        impl Display for Reference<()> {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                match self.typ() {
-                    $(
-                    AllocationType::$variant => unsafe { self.cast::<$t>().fmt(f) },
                     )*
                 }
             }

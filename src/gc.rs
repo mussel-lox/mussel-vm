@@ -21,7 +21,6 @@ impl GarbageCollector {
 impl Drop for GarbageCollector {
     fn drop(&mut self) {
         for reference in &mut self.allocations {
-            println!("dropping {:?} {}", reference, reference);
             unsafe { reference.finalize() };
         }
     }

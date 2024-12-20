@@ -60,7 +60,7 @@ impl Display for Value {
             Value::Number(n) => n.fmt(f),
             Value::Boolean(b) => b.fmt(f),
             Value::Nil => write!(f, "nil"),
-            Value::String(s) => s.fmt(f),
+            Value::String(s) => s.deref().fmt(f),
         }
     }
 }
