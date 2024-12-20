@@ -26,6 +26,8 @@ impl VirtualMachine {
     }
 
     /// Reset the program states, as if the VM is just created and ready to execute bytecode.
+    ///
+    /// Note that GC is not reset here, it's up to itself to collect garbage.
     pub fn reset(&mut self) {
         self.stack.clear();
     }

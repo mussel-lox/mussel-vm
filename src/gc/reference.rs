@@ -18,8 +18,8 @@ pub(super) trait AllowedAllocationType {}
 /// cause undefined behavior.
 #[repr(C)]
 #[derive(Debug)]
-pub(super) struct RawAllocation<T> {
-    typ: AllocationType,
+struct RawAllocation<T> {
+    kind: AllocationKind,
     value: T,
 }
 
@@ -39,14 +39,14 @@ impl<T> Reference<T> {
     ///
     /// A helper trait [`AllowedAllocationType`] is applied to limit the value type [`T`] in a
     /// valid range. However. this function is still marked with `unsafe` because the other parts
-    /// of code might get the [`AllocationType`] wrong. Check `unsafe` code carefully!
+    /// of code might get the [`AllocationKind`] wrong. Check `unsafe` code carefully!
     #[allow(private_bounds)]
     #[allow(private_interfaces)]
-    pub unsafe fn spawn(typ: AllocationType, value: T) -> Self
+    pub unsafe fn spawn(kind: AllocationKind, value: T) -> Self
     where
         T: AllowedAllocationType,
     {
-        Self(NonNull::new_unchecked(Box::into_raw(Box::new(RawAllocation { typ, value }))).cast())
+        Self(NonNull::new_unchecked(Box::into_raw(Box::new(RawAllocation { kind, value }))).cast())
     }
 
     /// Cast a reference from type [`T`] to type [`U`].
@@ -54,6 +54,15 @@ impl<T> Reference<T> {
     /// This is extremely unsafe since we cannot ensure if the casting is correct.
     pub unsafe fn cast<U>(self) -> Reference<U> {
         Reference(self.0.cast())
+    }
+
+    /// Returns the [`AllocationKind`] of the reference.
+    ///
+    /// This operation is theoretically safe, since the `repr(C)` is applied and the layout
+    /// except [`T`] of [`RawAllocation`] should keep the same: we can safely get the allocation
+    /// type.
+    pub fn kind(&self) -> AllocationKind {
+        unsafe { self.0.as_ref().kind }
     }
 }
 
@@ -91,7 +100,7 @@ impl<T> Eq for Reference<T> {}
 ///
 /// This trait is safe: when the underlying type is [`T`], it returns some reference; otherwise,
 /// [`None`] is returned. The principle is simple: we just check the metadata (i.e.
-/// [`AllocationType`]) in the [`RawAllocation`], and returns the reference if matches.
+/// [`AllocationKind`]) in the [`RawAllocation`], and returns the reference if matches.
 pub trait Downcast<T> {
     /// Returns an immutable reference of [`T`] if the type matches, [`None`] is returned otherwise.
     fn downcast(&self) -> Option<&T>;
@@ -110,7 +119,7 @@ macro_rules! register_allowed_types {
         /// The metadata to recognize the actual type of an allocation.
         #[repr(C)]
         #[derive(Debug, Clone, Copy)]
-        pub(super) enum AllocationType {
+        pub enum AllocationKind {
             $($variant), *
         }
 
@@ -119,10 +128,12 @@ macro_rules! register_allowed_types {
 
         impl Downcast<$t> for Reference<()> {
             fn downcast(&self) -> Option<&$t> {
-                let allocation = unsafe { self.0.as_ref() };
                 #[allow(unreachable_patterns)]
-                match allocation.typ {
-                    AllocationType::$variant => Some(unsafe { &*(self as *const _ as *const $t) }),
+                match self.kind() {
+                    AllocationKind::$variant => {
+                        let reference = unsafe { self.cast::<$t>() };
+                        Some(unsafe { &reference.0.as_ref().value })
+                    }
                     _ => None
                 }
             }
@@ -130,8 +141,11 @@ macro_rules! register_allowed_types {
             fn downcast_mut(&mut self) -> Option<&mut $t> {
                 let allocation = unsafe { self.0.as_ref() };
                 #[allow(unreachable_patterns)]
-                match allocation.typ {
-                    AllocationType::$variant => Some(unsafe { &mut *(self as *mut _ as *mut $t) }),
+                match allocation.kind {
+                    AllocationKind::$variant => {
+                        let mut reference = unsafe { self.cast::<$t>() };
+                        Some(unsafe { &mut reference.0.as_mut().value })
+                    }
                     _ => None
                 }
             }
@@ -154,9 +168,9 @@ macro_rules! register_allowed_types {
             /// reference.
             pub unsafe fn finalize(&mut self) {
                 let allocation = unsafe { self.0.as_ref() };
-                match allocation.typ {
+                match allocation.kind {
                     $(
-                    AllocationType::$variant => self.0.cast::<RawAllocation<$t>>().drop_in_place(),
+                    AllocationKind::$variant => self.0.cast::<RawAllocation<$t>>().drop_in_place(),
                     )*
                 }
             }

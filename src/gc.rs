@@ -21,6 +21,17 @@ impl GarbageCollector {
 impl Drop for GarbageCollector {
     fn drop(&mut self) {
         for reference in &mut self.allocations {
+            #[cfg(feature = "gc-trace")]
+            {
+                eprint!("=== GC Trace === Dropped <reference at {:p}>", reference);
+                match reference.kind() {
+                    AllocationKind::String => {
+                        let s: &String = reference.downcast().unwrap();
+                        eprint!(" \"{}\"", s);
+                    }
+                }
+                eprintln!();
+            }
             unsafe { reference.finalize() };
         }
     }
@@ -37,7 +48,7 @@ impl Allocate<String> for GarbageCollector {
         if let Some(index) = self.string_pool.get(&value) {
             return unsafe { self.allocations[*index].cast() };
         }
-        let allocation = unsafe { Reference::spawn(AllocationType::String, value.clone()) };
+        let allocation = unsafe { Reference::spawn(AllocationKind::String, value.clone()) };
         self.string_pool.insert(value, self.allocations.len());
         self.allocations.push(unsafe { allocation.cast() });
         allocation
@@ -50,7 +61,7 @@ macro_rules! spawn_impl {
         $(
         impl Allocate<$t> for GarbageCollector {
             fn allocate(&mut self, value: $t) -> Reference<$t> {
-                let allocation = unsafe { Reference::spawn(AllocationType::$variant, value) };
+                let allocation = unsafe { Reference::spawn(AllocationKind::$variant, value) };
                 self.allocations.push(unsafe { allocation.cast() });
                 allocation
             }
