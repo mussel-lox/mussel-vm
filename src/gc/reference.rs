@@ -139,9 +139,8 @@ macro_rules! register_allowed_types {
             }
 
             fn downcast_mut(&mut self) -> Option<&mut $t> {
-                let allocation = unsafe { self.0.as_ref() };
                 #[allow(unreachable_patterns)]
-                match allocation.kind {
+                match self.kind() {
                     AllocationKind::$variant => {
                         let mut reference = unsafe { self.cast::<$t>() };
                         Some(unsafe { &mut reference.0.as_mut().value })
@@ -167,10 +166,11 @@ macro_rules! register_allowed_types {
             /// adopted by GC. Any other parts of the program should not finalize any single
             /// reference.
             pub unsafe fn finalize(&mut self) {
-                let allocation = unsafe { self.0.as_ref() };
-                match allocation.kind {
+                match self.kind() {
                     $(
-                    AllocationKind::$variant => self.0.cast::<RawAllocation<$t>>().drop_in_place(),
+                    AllocationKind::$variant => {
+                        std::mem::drop(Box::from_raw(self.cast::<$t>().0.as_mut()))
+                    }
                     )*
                 }
             }

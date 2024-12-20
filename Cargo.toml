@@ -1,6 +1,6 @@
 [package]
 name = "mussel-vm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
@@ -8,6 +8,9 @@ anyhow = "1.0.94"
 astack = { version = "0.3.5", features = ["std"] }
 byteorder = "1.5.0"
 paste = "1.0.15"
+
+[profile.release]
+lto = true
 
 [features]
 default = ["gc-trace"]
