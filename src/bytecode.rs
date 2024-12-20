@@ -21,6 +21,7 @@ pub type ConstantIndex = u16;
 /// source code level (e.g. control flows) are implemented by several kinds of jump instructions.
 #[repr(u8)]
 pub enum OperationCode {
+    /* Value operations */
     /// Load a constant into the VM stack, with its index stored as `u16` following the operation
     /// code.
     Constant,
@@ -28,15 +29,18 @@ pub enum OperationCode {
     True,
     False,
 
+    /* Unary operations */
     Negate,
     Not,
 
+    /* Binary operations */
     Add,
     Subtract,
     Multiply,
     Divide,
     Return,
 
+    /* Relational operations */
     Equal,
     Greater,
     Less,

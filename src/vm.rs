@@ -1,4 +1,5 @@
 use crate::bytecode::{Bytecode, BytecodeReader, Constant, FetchBytecodeExt, OperationCode};
+use crate::gc::{Allocate, GarbageCollector};
 use crate::value::Value;
 use anyhow::{bail, Result};
 use astack::{Stack, StackError};
@@ -12,6 +13,7 @@ pub const STACK_SIZE: usize = 1024;
 /// expression evaluation on it.
 pub struct VirtualMachine {
     stack: Stack<Value, STACK_SIZE>,
+    gc: GarbageCollector,
 }
 
 impl VirtualMachine {
@@ -19,6 +21,7 @@ impl VirtualMachine {
     pub fn new() -> Self {
         Self {
             stack: Stack::new(),
+            gc: GarbageCollector::new(),
         }
     }
 
@@ -56,7 +59,10 @@ impl VirtualMachine {
                     let index: u16 = reader.fetch()?;
                     match reader.load(index as usize)? {
                         Constant::Number(n) => self.push(Value::Number(n))?,
-                        Constant::String(s) => self.push(Value::String(s))?,
+                        Constant::String(s) => {
+                            let allocation = self.gc.allocate(s);
+                            self.stack.push(Value::String(allocation))?;
+                        }
                     }
                 }
                 OperationCode::Nil => self.stack.push(Value::Nil)?,
@@ -72,7 +78,20 @@ impl VirtualMachine {
                     self.push(Value::Boolean(boolean))?;
                 }
 
-                OperationCode::Add => arithmetic!(+ as Number),
+                OperationCode::Add => {
+                    let right = self.pop()?;
+                    let left = self.pop()?;
+                    match (left, right) {
+                        (Value::Number(left), Value::Number(right)) => {
+                            self.stack.push(Value::Number(left + right))?;
+                        }
+                        (Value::String(left), Value::String(right)) => {
+                            let concat = self.gc.allocate(format!("{}{}", *left, *right));
+                            self.stack.push(Value::String(concat))?;
+                        }
+                        _ => bail!("add operator `+` can only be applied to numbers or strings"),
+                    }
+                }
                 OperationCode::Subtract => arithmetic!(- as Number),
                 OperationCode::Multiply => arithmetic!(* as Number),
                 OperationCode::Divide => arithmetic!(/ as Number),
