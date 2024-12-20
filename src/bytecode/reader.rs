@@ -6,13 +6,18 @@ use std::mem;
 
 /// A shallow encapsulation of [`Bytecode`].
 ///
-/// Reading bytecode, including operation codes, operands and constants is easy using this struct.
+/// For operation codes and operands, just call `fetch()`. The offset, endianness and type
+/// conversion is considered internally. For constants, just call `load()`.
 pub struct BytecodeReader<'a> {
     cursor: Cursor<&'a Vec<u8>>,
     constants: &'a Vec<Constant>,
 }
 
 impl<'a> BytecodeReader<'a> {
+    /// Create a BytecodeReader.
+    ///
+    /// BytecodeReader immutably borrows a [`Bytecode`]. That should be easy to optimize and thus
+    /// get performance improvements for Rust compiler.
     pub fn new(bytecode: &'a Bytecode) -> Self {
         Self {
             cursor: Cursor::new(&bytecode.code),
@@ -20,6 +25,7 @@ impl<'a> BytecodeReader<'a> {
         }
     }
 
+    /// Load a constant if any, reports an [`anyhow::Error`] if index out of bounds.
     pub fn load(&mut self, index: usize) -> Result<Constant> {
         if index >= self.constants.len() {
             bail!("constant index {} out of bounds", index);
@@ -28,6 +34,11 @@ impl<'a> BytecodeReader<'a> {
     }
 }
 
+/// Helper trait to read operation codes and operands conveniently.
+///
+/// User does not need to call different methods when fetching operation codes or operands in
+/// different types. Just call `fetch()` (with type annotations usually) and let the compiler
+/// handles it.
 pub trait FetchBytecodeExt<T> {
     fn fetch(&mut self) -> Result<T>;
 }
