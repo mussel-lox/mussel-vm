@@ -1,8 +1,9 @@
-use crate::bytecode::{Bytecode, Constant, ConstantIndex, OperationCode, ENDIANNESS};
+use std::{collections::HashMap, io::Cursor};
+
 use anyhow::{bail, Result};
 use byteorder::WriteBytesExt;
-use std::collections::HashMap;
-use std::io::Cursor;
+
+use crate::bytecode::{Bytecode, Constant, ConstantIndex, OperationCode, ENDIANNESS};
 
 /// A shallow encapsulation of [`Bytecode`].
 ///

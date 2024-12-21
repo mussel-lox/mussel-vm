@@ -1,0 +1,7 @@
+# Custom rustfmt settings
+#
+# Some items are only available under nightly toolchain. It doesn't need to compile the
+# whole project with nightly rustc, just reformat it using the nightly rustfmt.
+
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"

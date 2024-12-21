@@ -1,8 +1,9 @@
-use crate::bytecode::{Bytecode, Constant, OperationCode, ENDIANNESS};
+use std::{io::Cursor, mem};
+
 use anyhow::{bail, Result};
 use byteorder::ReadBytesExt;
-use std::io::Cursor;
-use std::mem;
+
+use crate::bytecode::{Bytecode, Constant, OperationCode, ENDIANNESS};
 
 /// A shallow encapsulation of [`Bytecode`].
 ///

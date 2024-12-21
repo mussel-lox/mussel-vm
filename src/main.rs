@@ -1,7 +1,9 @@
 use anyhow::Result;
-use mussel_vm::bytecode;
-use mussel_vm::bytecode::{Constant, ConstantIndex, GlobalStateIndex, OperationCode};
-use mussel_vm::vm::VirtualMachine;
+use mussel_vm::{
+    bytecode,
+    bytecode::{Constant, ConstantIndex, GlobalStateIndex, OperationCode},
+    vm::VirtualMachine,
+};
 
 fn main() -> Result<()> {
     let bytecode = bytecode! {

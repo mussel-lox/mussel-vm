@@ -1,8 +1,11 @@
+use std::{
+    fmt::{Display, Formatter},
+    hash::{Hash, Hasher},
+    ops::Deref,
+    ptr,
+};
+
 use crate::gc::Reference;
-use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
-use std::ptr;
 
 /// The value types of Mussel VM.
 ///

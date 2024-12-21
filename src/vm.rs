@@ -1,10 +1,13 @@
-use crate::bytecode::{
-    Bytecode, BytecodeReader, Constant, FetchBytecodeExt, GlobalStateIndex, OperationCode,
-};
-use crate::gc::{Allocate, GarbageCollector};
-use crate::stack::Stack;
-use crate::value::Value;
 use anyhow::{bail, Result};
+
+use crate::{
+    bytecode::{
+        Bytecode, BytecodeReader, Constant, FetchBytecodeExt, GlobalStateIndex, OperationCode,
+    },
+    gc::{Allocate, GarbageCollector},
+    stack::Stack,
+    value::Value,
+};
 
 pub const STACK_SIZE: usize = 1024;
 

@@ -1,8 +1,11 @@
+use std::{
+    mem,
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut},
+    slice::{Iter, IterMut},
+};
+
 use anyhow::{bail, Result};
-use std::mem;
-use std::mem::MaybeUninit;
-use std::ops::{Deref, DerefMut};
-use std::slice::{Iter, IterMut};
 
 pub struct Stack<T, const N: usize> {
     elements: [MaybeUninit<T>; N],

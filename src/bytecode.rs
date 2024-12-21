@@ -1,5 +1,6 @@
-use byteorder::LittleEndian;
 use std::hash::{Hash, Hasher};
+
+use byteorder::LittleEndian;
 
 mod reader;
 mod writer;

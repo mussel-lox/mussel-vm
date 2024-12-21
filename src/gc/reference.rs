@@ -1,7 +1,9 @@
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
-use std::ptr;
-use std::ptr::NonNull;
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+    ptr,
+    ptr::NonNull,
+};
 
 /// Helper trait to limit a generic type parameter to a range of GC allowed allocation types.
 pub(super) trait AllowedAllocationType {}
