@@ -48,6 +48,10 @@ impl VirtualMachine {
         let mut reader = BytecodeReader::new(bytecode);
         macro_rules! arithmetic {
             ($operator: tt as $variant: ident) => {{
+                /// SAFETY: The arithmetic operations can only be applied to numbers. When the
+                /// operands are reference types, an error will be instantly reported, leaving
+                /// the GC behavior unimportant. Thus, we don't need to keep the values on stack
+                /// before evaluation.
                 let right = self.stack.pop()?;
                 let left = self.stack.pop()?;
                 match (left, right) {
@@ -79,24 +83,39 @@ impl VirtualMachine {
                 OperationCode::True => self.stack.push(Value::Boolean(true))?,
                 OperationCode::False => self.stack.push(Value::Boolean(false))?,
 
+                /// SAFETY: Negate operation can only be applied on numbers. When the operand is
+                /// of reference type, an error will be reported instantly, leaving the GC
+                /// behavior unimportant. Thus, we don't have to keep the operand on stack before
+                /// evaluation.
                 OperationCode::Negate => match self.stack.pop()? {
                     Value::Number(n) => self.stack.push(Value::Number(-n))?,
                     _ => bail!("negate operator `-` can only be applied to numbers"),
                 },
                 OperationCode::Not => {
+                    /// SAFETY: Not operation indeed can be applied to all value types, including
+                    /// the reference types. However, whether the converted value true or false
+                    /// is irrelevant to the validity of the reference, and no dereferencing is
+                    /// performed. Thus, the value doesn't need to be on stack before evaluation.
                     let boolean: bool = self.stack.pop()?.into();
                     self.stack.push(Value::Boolean(boolean))?;
                 }
 
                 OperationCode::Add => {
-                    let right = self.stack.pop()?;
-                    let left = self.stack.pop()?;
+                    /// SAFETY: Add operation can be applied to numbers or strings, and the
+                    /// latter is a reference type. We'll have to keep the reference values on
+                    /// stack before evaluation since we cannot know when the GC will execute.
+                    let right = self.stack.peek(0)?;
+                    let left = self.stack.peek(1)?;
                     match (left, right) {
                         (Value::Number(left), Value::Number(right)) => {
+                            self.stack.pop()?;
+                            self.stack.pop()?;
                             self.stack.push(Value::Number(left + right))?;
                         }
                         (Value::String(left), Value::String(right)) => {
-                            let concat = self.gc.allocate(format!("{}{}", *left, *right));
+                            let concat = self.gc.allocate(format!("{}{}", **left, **right));
+                            self.stack.pop()?;
+                            self.stack.pop()?;
                             self.stack.push(Value::String(concat))?;
                         }
                         _ => bail!("add operator `+` can only be applied to numbers or strings"),
@@ -108,9 +127,15 @@ impl VirtualMachine {
                 OperationCode::Return => break,
 
                 OperationCode::Equal => {
-                    let right = self.stack.pop()?;
-                    let left = self.stack.pop()?;
-                    self.stack.push(Value::Boolean(left == right))?;
+                    /// SAFETY: Equal operation can be applied to each kind of values, and
+                    /// there's reference types. We'll have to keep the reference values on stack
+                    /// before evaluation since we cannot know when the GC will execute.
+                    let right = self.stack.peek(0)?;
+                    let left = self.stack.peek(1)?;
+                    let equal = Value::Boolean(left == right);
+                    self.stack.pop()?;
+                    self.stack.pop()?;
+                    self.stack.push(equal)?;
                 }
                 OperationCode::Greater => arithmetic!(> as Boolean),
                 OperationCode::Less => arithmetic!(< as Boolean),
@@ -130,9 +155,16 @@ impl VirtualMachine {
                     self.stack.push(self.globals[index as usize].clone())?
                 }
 
+                /// No SAFETY here because the Pop operation means to pop a value out of
+                /// stack directly.
                 OperationCode::Pop => drop(self.stack.pop()?),
 
-                OperationCode::Print => println!("{}", self.stack.pop()?),
+                OperationCode::Print => {
+                    /// SAFETY: Print can be applied on reference types, and thus we must keep
+                    /// them on stack before printing to prevent GC to collect them.
+                    println!("{}", self.stack.top()?);
+                    self.stack.pop()?;
+                }
 
                 OperationCode::Impossible => unreachable!(),
             }
