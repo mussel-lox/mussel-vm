@@ -1,5 +1,6 @@
 pub mod bytecode;
 pub mod gc;
+pub mod stack;
 pub mod value;
 pub mod vm;
 
