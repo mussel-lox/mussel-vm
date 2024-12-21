@@ -16,7 +16,10 @@ pub type ENDIANNESS = LittleEndian;
 pub type ConstantIndex = u16;
 
 /// The type of global states' (i.e. variables) index.
-pub type GlobalStateIndex = u16;
+pub type GlobalIndex = u8;
+
+/// The type of locals' index (i.e. the stack index).
+pub type LocalOffset = u8;
 
 /// The operation codes.
 ///
@@ -51,13 +54,19 @@ pub enum OperationCode {
 
     /* Global states */
     /// Pops the top element of the stack, and sets it as a global state (i.e. variable) with its
-    /// index in [`GlobalStateIndex`] type.
+    /// index in [`GlobalIndex`] type.
     SetGlobal,
     /// Gets the specified global variable, and push it into the stack. Same as the `SetGlobal`
-    /// operation code, this code is followed by a [`GlobalStateIndex`].
+    /// operation code, this code is followed by a [`GlobalIndex`].
     GetGlobal,
 
     /* Local (Stack) states */
+    /// Gets the specified slot of stack and pushes the value at the top of it. This code is
+    /// followed by a [`LocalOffset`], which is an offset starts from the current call frame.
+    GetLocal,
+    /// Pops the specified slot with a [`LocalOffset`] offset starts from the current call frame and pushes
+    /// the value at the top of the stack.
+    SetLocal,
     /// Simply pops and drops the top element of the stack.
     Pop,
 

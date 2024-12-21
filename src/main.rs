@@ -1,31 +1,26 @@
 use anyhow::Result;
 use mussel_vm::{
     bytecode,
-    bytecode::{Constant, ConstantIndex, GlobalStateIndex, OperationCode},
+    bytecode::{Constant, ConstantIndex, LocalOffset, OperationCode},
     vm::VirtualMachine,
 };
 
 fn main() -> Result<()> {
     let bytecode = bytecode! {
         const [
-            Constant::String("beignets".into()),
-            Constant::String("cafe au lait".into()),
-            Constant::String("beignets with ".into()),
+            Constant::String("outer".into()),
+            Constant::String("inner".into()),
         ]
-
-        OperationCode::Constant; 0 as ConstantIndex;
-        OperationCode::SetGlobal; 0 as GlobalStateIndex;
-        OperationCode::Pop;
-        OperationCode::Constant; 1 as ConstantIndex;
-        OperationCode::SetGlobal; 1 as GlobalStateIndex;
-        OperationCode::Pop;
-        OperationCode::Constant; 2 as ConstantIndex;
-        OperationCode::GetGlobal; 1 as GlobalStateIndex;
-        OperationCode::Add;
-        OperationCode::SetGlobal; 0 as GlobalStateIndex;
-        OperationCode::Pop;
-        OperationCode::GetGlobal; 0 as GlobalStateIndex;
+                                                     // {
+        OperationCode::Constant; 0 as ConstantIndex; //     var a = "outer";
+                                                     //     {
+        OperationCode::Constant; 1 as ConstantIndex; //         var a = "inner";
+        OperationCode::GetLocal; 1 as LocalOffset;   //         print a;
         OperationCode::Print;
+        OperationCode::Pop;                          //     }
+        OperationCode::GetLocal; 0 as LocalOffset;   //     print a;
+        OperationCode::Print;
+        OperationCode::Pop;                          // }
         OperationCode::Return;
     };
 

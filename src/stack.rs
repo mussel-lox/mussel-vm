@@ -1,7 +1,7 @@
 use std::{
     mem,
     mem::MaybeUninit,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
     slice::{Iter, IterMut},
 };
 
@@ -138,5 +138,25 @@ impl<'a, T, const N: usize> IntoIterator for &'a mut Stack<T, N> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.deref_mut().into_iter()
+    }
+}
+
+impl<T, const N: usize> Index<usize> for Stack<T, N> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index >= self.len() {
+            panic!("index {} out of bounds", index);
+        }
+        unsafe { mem::transmute(&self.elements[index]) }
+    }
+}
+
+impl<T, const N: usize> IndexMut<usize> for Stack<T, N> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index >= self.len() {
+            panic!("index {} out of bounds", index);
+        }
+        unsafe { mem::transmute(&mut self.elements[index]) }
     }
 }
