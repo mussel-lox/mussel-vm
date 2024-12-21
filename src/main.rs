@@ -1,26 +1,32 @@
 use anyhow::Result;
 use mussel_vm::{
     bytecode,
-    bytecode::{Constant, ConstantIndex, LocalOffset, OperationCode},
+    bytecode::{Constant, ConstantIndex, JumpOffset, OperationCode},
     vm::VirtualMachine,
 };
 
 fn main() -> Result<()> {
     let bytecode = bytecode! {
         const [
-            Constant::String("outer".into()),
-            Constant::String("inner".into()),
+            Constant::Number(114.0),
+            Constant::Number(514.0),
+            Constant::Number(1919810.0),
+            Constant::String("OK".into()),
+            Constant::String("WTF".into()),
         ]
-                                                     // {
-        OperationCode::Constant; 0 as ConstantIndex; //     var a = "outer";
-                                                     //     {
-        OperationCode::Constant; 1 as ConstantIndex; //         var a = "inner";
-        OperationCode::GetLocal; 1 as LocalOffset;   //         print a;
+
+        OperationCode::Constant; 0 as ConstantIndex; // if (114 + 514 < 1919810)
+        OperationCode::Constant; 1 as ConstantIndex;
+        OperationCode::Add;
+        OperationCode::Constant; 2 as ConstantIndex;
+        OperationCode::Less;
+        OperationCode::JumpIfFalse; 7 as JumpOffset; // {
+        OperationCode::Constant; 3 as JumpOffset;    //     print "OK";
         OperationCode::Print;
-        OperationCode::Pop;                          //     }
-        OperationCode::GetLocal; 0 as LocalOffset;   //     print a;
+        OperationCode::Jump; 4 as JumpOffset;        // } else {
+        OperationCode::Constant; 4 as JumpOffset;    //     print "WTF";
         OperationCode::Print;
-        OperationCode::Pop;                          // }
+                                                     // }
         OperationCode::Return;
     };
 

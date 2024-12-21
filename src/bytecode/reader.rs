@@ -1,4 +1,7 @@
-use std::{io::Cursor, mem};
+use std::{
+    io::{Cursor, Seek},
+    mem,
+};
 
 use anyhow::{bail, Result};
 use byteorder::ReadBytesExt;
@@ -32,6 +35,10 @@ impl<'a> BytecodeReader<'a> {
             bail!("constant index {} out of bounds", index);
         }
         Ok(self.constants[index].clone())
+    }
+
+    pub fn jump(&mut self, offset: isize) -> Result<()> {
+        Ok(self.cursor.seek_relative(offset as i64)?)
     }
 }
 
@@ -74,4 +81,4 @@ macro_rules! fetch_primitives_impl {
     };
 }
 
-fetch_primitives_impl!(u16);
+fetch_primitives_impl!(u16, i16);

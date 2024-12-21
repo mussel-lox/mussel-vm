@@ -19,10 +19,10 @@ pub enum Value {
     String(Reference<String>),
 }
 
-impl From<Value> for bool {
-    fn from(value: Value) -> Self {
-        match value {
-            Value::Boolean(b) => b,
+impl Value {
+    pub fn as_boolean(&self) -> bool {
+        match self {
+            Value::Boolean(b) => *b,
             Value::Nil => false,
             _ => true,
         }

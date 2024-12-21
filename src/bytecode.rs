@@ -10,16 +10,15 @@ pub use writer::*;
 
 /// The endianness of bytecode. Used in [`BytecodeReader`] and [`BytecodeWriter`].
 pub type ENDIANNESS = LittleEndian;
-
 /// The type of constant index in a [`Bytecode`]. Defined using typedef to deal with possible changes in
 /// the future.
 pub type ConstantIndex = u16;
-
 /// The type of global states' (i.e. variables) index.
 pub type GlobalIndex = u8;
-
 /// The type of locals' index (i.e. the stack index).
 pub type LocalOffset = u8;
+/// The type of the jump offset. It can be negative to indicating jumping backward.
+pub type JumpOffset = i16;
 
 /// The operation codes.
 ///
@@ -28,7 +27,6 @@ pub type LocalOffset = u8;
 /// source code level (e.g. control flows) are implemented by several kinds of jump instructions.
 #[repr(u8)]
 pub enum OperationCode {
-    /* Value loading */
     /// Load a constant into the VM stack, with its index stored as `u16` following the operation
     /// code.
     Constant,
@@ -36,23 +34,18 @@ pub enum OperationCode {
     True,
     False,
 
-    /* Unary operations */
     Negate,
     Not,
 
-    /* Binary operations */
     Add,
     Subtract,
     Multiply,
     Divide,
-    Return,
 
-    /* Relational operations */
     Equal,
     Greater,
     Less,
 
-    /* Global states */
     /// Pops the top element of the stack, and sets it as a global state (i.e. variable) with its
     /// index in [`GlobalIndex`] type.
     SetGlobal,
@@ -60,7 +53,6 @@ pub enum OperationCode {
     /// operation code, this code is followed by a [`GlobalIndex`].
     GetGlobal,
 
-    /* Local (Stack) states */
     /// Gets the specified slot of stack and pushes the value at the top of it. This code is
     /// followed by a [`LocalOffset`], which is an offset starts from the current call frame.
     GetLocal,
@@ -70,7 +62,14 @@ pub enum OperationCode {
     /// Simply pops and drops the top element of the stack.
     Pop,
 
-    /* Intrinsic */
+    /// Jumps according to the following [`JumpOffset`] if the top element of the current stack
+    /// can be evaluated as false. The offset can be positive or negative, in order to jump
+    /// forward or backward.
+    JumpIfFalse,
+    /// Instantly jumps according to the following [`JumpOffset`]. There's no conditions to meet.
+    Jump,
+    Return,
+
     Print,
 
     /// Guard variant to detect invalid operation codes.

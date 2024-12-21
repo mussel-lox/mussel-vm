@@ -86,4 +86,4 @@ macro_rules! emit_primitives_impl {
     };
 }
 
-emit_primitives_impl!(u16);
+emit_primitives_impl!(u16, i16);

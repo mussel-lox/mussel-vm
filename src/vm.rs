@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 
 use crate::{
     bytecode::{
-        Bytecode, BytecodeReader, Constant, FetchBytecodeExt, GlobalIndex, LocalOffset,
+        Bytecode, BytecodeReader, Constant, FetchBytecodeExt, GlobalIndex, JumpOffset, LocalOffset,
         OperationCode,
     },
     gc::{Allocate, GarbageCollector},
@@ -98,7 +98,7 @@ impl VirtualMachine {
                     // the reference types. However, whether the converted value true or false
                     // is irrelevant to the validity of the reference, and no dereferencing is
                     // performed. Thus, the value doesn't need to be on stack before evaluation.
-                    let boolean: bool = self.stack.pop()?.into();
+                    let boolean: bool = self.stack.pop()?.as_boolean();
                     self.stack.push(Value::Boolean(boolean))?;
                 }
 
@@ -127,7 +127,6 @@ impl VirtualMachine {
                 OperationCode::Subtract => arithmetic!(- as Number),
                 OperationCode::Multiply => arithmetic!(* as Number),
                 OperationCode::Divide => arithmetic!(/ as Number),
-                OperationCode::Return => break,
 
                 OperationCode::Equal => {
                     // SAFETY: Equal operation can be applied to each kind of values, and
@@ -164,6 +163,19 @@ impl VirtualMachine {
                 // No SAFETY here because the Pop operation means to pop a value out of
                 // stack directly.
                 OperationCode::Pop => drop(self.stack.pop()?),
+
+                OperationCode::JumpIfFalse => {
+                    let offset: JumpOffset = reader.fetch()?;
+                    let condition: bool = self.stack.top()?.as_boolean();
+                    if condition == false {
+                        reader.jump(offset as isize)?;
+                    }
+                }
+                OperationCode::Jump => {
+                    let offset: JumpOffset = reader.fetch()?;
+                    reader.jump(offset as isize)?;
+                }
+                OperationCode::Return => break,
 
                 OperationCode::Print => {
                     // SAFETY: Print can be applied on reference types, and thus we must keep
