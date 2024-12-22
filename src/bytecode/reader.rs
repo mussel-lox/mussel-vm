@@ -3,7 +3,6 @@ use std::{
     mem,
 };
 
-use anyhow::{bail, Result};
 use byteorder::ReadBytesExt;
 
 use crate::bytecode::{Bytecode, Constant, Endianness, OperationCode};
@@ -33,21 +32,20 @@ impl<'a> BytecodeReader<'a> {
         self.cursor.position() as usize
     }
 
-    /// Load a constant if any, reports an [`anyhow::Error`] if index out of bounds.
-    pub fn load(&mut self, index: usize) -> Result<Constant> {
+    /// Load a constant if any, panics if index out of bounds.
+    pub fn load(&mut self, index: usize) -> Constant {
         if index >= self.constants.len() {
-            bail!("constant index {} out of bounds", index);
+            panic!("constant index {} out of bounds", index);
         }
-        Ok(self.constants[index].clone())
+        self.constants[index].clone()
     }
 
-    pub fn jump(&mut self, offset: isize) -> Result<()> {
-        Ok(self.cursor.seek_relative(offset as i64)?)
+    pub fn jump(&mut self, offset: isize) {
+        self.cursor.seek_relative(offset as i64).unwrap();
     }
 
-    pub fn seek(&mut self, index: usize) -> Result<()> {
-        self.cursor.seek(SeekFrom::Start(index as u64))?;
-        Ok(())
+    pub fn seek(&mut self, index: usize) {
+        self.cursor.seek(SeekFrom::Start(index as u64)).unwrap();
     }
 }
 
@@ -57,22 +55,22 @@ impl<'a> BytecodeReader<'a> {
 /// different types. Just call `fetch()` (with type annotations usually) and let the compiler
 /// handles it.
 pub trait Fetch<T> {
-    fn fetch(&mut self) -> Result<T>;
+    fn fetch(&mut self) -> T;
 }
 
 impl Fetch<OperationCode> for BytecodeReader<'_> {
-    fn fetch(&mut self) -> Result<OperationCode> {
-        let candidate = self.cursor.read_u8()?;
+    fn fetch(&mut self) -> OperationCode {
+        let candidate = self.cursor.read_u8().unwrap();
         if candidate >= OperationCode::Impossible as u8 {
-            bail!("invalid operation code {}", candidate);
+            panic!("invalid operation code {}", candidate);
         }
-        Ok(unsafe { mem::transmute(candidate) })
+        unsafe { mem::transmute(candidate) }
     }
 }
 
 impl Fetch<u8> for BytecodeReader<'_> {
-    fn fetch(&mut self) -> Result<u8> {
-        Ok(self.cursor.read_u8()?)
+    fn fetch(&mut self) -> u8 {
+        self.cursor.read_u8().unwrap()
     }
 }
 
@@ -81,8 +79,8 @@ macro_rules! fetch_primitives_impl {
         paste::paste! {
             $(
             impl Fetch<$t> for BytecodeReader<'_> {
-                fn fetch(&mut self) -> Result<$t> {
-                    Ok(self.cursor.[<read_ $t>]::<Endianness>()?)
+                fn fetch(&mut self) -> $t {
+                    self.cursor.[<read_ $t>]::<Endianness>().unwrap()
                 }
             }
             )*

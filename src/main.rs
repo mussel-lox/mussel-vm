@@ -1,11 +1,10 @@
-use anyhow::Result;
 use mussel_vm::{
     bytecode,
     bytecode::{CallPosition, Constant, ConstantIndex, LocalOffset, OperationCode},
     vm::VirtualMachine,
 };
 
-fn main() -> Result<()> {
+fn main() {
     let bytecode = bytecode! {
         const [
             Constant::Number(114.0),
@@ -28,5 +27,5 @@ fn main() -> Result<()> {
     };
 
     let mut vm = VirtualMachine::new();
-    vm.interpret(&bytecode)
+    vm.interpret(&bytecode);
 }

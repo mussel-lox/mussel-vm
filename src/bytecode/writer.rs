@@ -1,6 +1,5 @@
 use std::{collections::HashMap, io::Cursor};
 
-use anyhow::{bail, Result};
 use byteorder::WriteBytesExt;
 
 use crate::bytecode::{Bytecode, Constant, ConstantIndex, Endianness, OperationCode};
@@ -37,18 +36,18 @@ impl<'a> BytecodeWriter<'a> {
     ///
     /// Note that constant caching is implemented, which means the index of an existing constant
     /// will be directly returned without writing it twice in the constant section of [`Bytecode`].
-    pub fn define(&mut self, constant: Constant) -> Result<ConstantIndex> {
+    pub fn define(&mut self, constant: Constant) -> ConstantIndex {
         if let Some(index) = self.constant_cache.get(&constant) {
-            return Ok(*index);
+            return *index;
         }
         // Define a new constant.
         if self.constants.len() > ConstantIndex::MAX as usize {
-            bail!("too many constants");
+            panic!("too many constants");
         }
         let index = self.constants.len() as ConstantIndex;
         self.constants.push(constant.clone());
         self.constant_cache.insert(constant, index);
-        Ok(index)
+        index
     }
 }
 
@@ -57,18 +56,18 @@ impl<'a> BytecodeWriter<'a> {
 /// User does not need to call different methods when emitting different types into [`Bytecode`].
 /// Just call `emit(...)` and let the compiler handles it.
 pub trait Emit<T> {
-    fn emit(&mut self, value: T) -> Result<()>;
+    fn emit(&mut self, value: T);
 }
 
 impl Emit<OperationCode> for BytecodeWriter<'_> {
-    fn emit(&mut self, value: OperationCode) -> Result<()> {
-        Ok(self.cursor.write_u8(value as u8)?)
+    fn emit(&mut self, value: OperationCode) {
+        self.cursor.write_u8(value as u8).unwrap();
     }
 }
 
 impl Emit<u8> for BytecodeWriter<'_> {
-    fn emit(&mut self, value: u8) -> Result<()> {
-        Ok(self.cursor.write_u8(value)?)
+    fn emit(&mut self, value: u8) {
+        self.cursor.write_u8(value).unwrap();
     }
 }
 
@@ -77,8 +76,8 @@ macro_rules! emit_primitives_impl {
         paste::paste! {
             $(
             impl Emit<$t> for BytecodeWriter<'_> {
-                fn emit(&mut self, value: $t) -> Result<()> {
-                    Ok(self.cursor.[<write_ $t>]::<Endianness>(value)?)
+                fn emit(&mut self, value: $t)  {
+                    self.cursor.[<write_ $t>]::<Endianness>(value).unwrap();
                 }
             }
             )*

@@ -5,8 +5,6 @@ use std::{
     slice::{Iter, IterMut},
 };
 
-use anyhow::{bail, Result};
-
 /// The Stack data structure.
 ///
 /// This struct is adopted because the [`Vec`] is allocated on heap. More specifically, it's
@@ -44,7 +42,7 @@ impl<T, const N: usize> Stack<T, N> {
         self.top == 0
     }
 
-    /// Get a reference to the top `n`-th element of the stack if any.
+    /// Get a reference to the top `n`-th element of the stack.
     ///
     /// When we talk about the "top" concept in the [`Stack`], we're talking about the last
     /// pushed elements. The last pushed elements are placed on top of those first pushed ones,
@@ -54,41 +52,35 @@ impl<T, const N: usize> Stack<T, N> {
     /// in-place, without memory cost of `pop`ping and `push`ing them back and forth.
     ///
     /// `n` must be in the range of the range `[0, len)`. When `n` == `0`, a reference of the top
-    /// element is returned, if any.
-    pub fn peek(&self, n: usize) -> Result<&T> {
+    /// element is returned.
+    pub fn peek(&self, n: usize) -> &T {
         if self.len() <= n {
-            bail!("stack underflow, cannot peek the top {}-th element", n);
+            panic!("stack underflow, cannot peek the top {}-th element", n);
         }
-        Ok(unsafe { self.elements[self.top - n - 1].assume_init_ref() })
+        unsafe { self.elements[self.top - n - 1].assume_init_ref() }
     }
 
     /// Gets the top element. It's a special form of `peek`.
-    pub fn top(&self) -> Result<&T> {
+    pub fn top(&self) -> &T {
         self.peek(0)
     }
 
     /// Pushes a value into the stack.
-    ///
-    /// If the stack overflows, an [`anyhow::Error`] is reported.
-    pub fn push(&mut self, value: T) -> Result<()> {
+    pub fn push(&mut self, value: T) {
         if self.len() >= N {
-            bail!("stack overflow");
+            panic!("stack overflow");
         }
         self.elements[self.top].write(value);
         self.top += 1;
-        Ok(())
     }
 
     /// Pops a value out of the stack.
-    ///
-    /// If the stack underflows, an [`anyhow::Error`] is returned.
-    pub fn pop(&mut self) -> Result<T> {
+    pub fn pop(&mut self) -> T {
         if self.is_empty() {
-            bail!("stack underflow");
+            panic!("stack underflow");
         }
         self.top -= 1;
-        let value = unsafe { self.elements[self.top].assume_init_read() };
-        Ok(value)
+        unsafe { self.elements[self.top].assume_init_read() }
     }
 
     /// Dropping every element, and sets the stack top to the first slot.

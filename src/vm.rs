@@ -1,9 +1,7 @@
-use anyhow::{bail, Result};
-
 use crate::{
     bytecode::{
-        Bytecode, BytecodeReader, CallPosition, Constant, Fetch, GlobalIndex, JumpOffset,
-        LocalOffset, OperationCode,
+        Bytecode, BytecodeReader, CallPosition, Constant, ConstantIndex, Fetch, GlobalIndex,
+        JumpOffset, LocalOffset, OperationCode,
     },
     gc::{Allocate, FunctionPointer, GarbageCollector},
     stack::Stack,
@@ -57,21 +55,21 @@ impl VirtualMachine {
     ///
     /// Note that the VM is not reset here, since there may be some needs to execute a piece of
     /// bytecode on some existing program states.
-    pub fn interpret(&mut self, bytecode: &Bytecode) -> Result<()> {
+    pub fn interpret(&mut self, bytecode: &Bytecode) {
         let mut reader = BytecodeReader::new(bytecode);
         macro_rules! arithmetic {
             ($operator: tt as $variant: ident) => {{
                 // SAFETY: The arithmetic operations can only be applied to numbers. When the
-                // operands are reference types, an error will be instantly reported, leaving
-                // the GC behavior unimportant. Thus, we don't need to keep the values on stack
-                // before evaluation.
-                let right = self.stack.pop()?;
-                let left = self.stack.pop()?;
+                // operands are reference types, a panic will happen and the VM process will be
+                // terminated, leaving the GC behavior unimportant. Thus, we don't need to keep
+                // the values on stack before evaluation.
+                let right = self.stack.pop();
+                let left = self.stack.pop();
                 match (left, right) {
                     (Value::Number(left), Value::Number(right)) => {
-                        self.stack.push(Value::$variant(left $operator right))?;
+                        self.stack.push(Value::$variant(left $operator right));
                     }
-                    _ => bail!(
+                    _ => panic!(
                         "arithmetic operator `{}` can only be applied to numbers",
                         stringify!($operator),
                     ),
@@ -80,65 +78,65 @@ impl VirtualMachine {
         }
 
         loop {
-            let opcode = reader.fetch()?;
+            let opcode = reader.fetch();
             match opcode {
                 OperationCode::Constant => {
-                    let index: u16 = reader.fetch()?;
-                    match reader.load(index as usize)? {
-                        Constant::Number(n) => self.stack.push(Value::Number(n))?,
+                    let index: ConstantIndex = reader.fetch();
+                    match reader.load(index as usize) {
+                        Constant::Number(n) => self.stack.push(Value::Number(n)),
                         Constant::String(s) => {
                             let allocation = self.gc.allocate(s);
-                            self.stack.push(Value::String(allocation))?;
+                            self.stack.push(Value::String(allocation));
                         }
                     }
                 }
-                OperationCode::Nil => self.stack.push(Value::Nil)?,
-                OperationCode::True => self.stack.push(Value::Boolean(true))?,
-                OperationCode::False => self.stack.push(Value::Boolean(false))?,
+                OperationCode::Nil => self.stack.push(Value::Nil),
+                OperationCode::True => self.stack.push(Value::Boolean(true)),
+                OperationCode::False => self.stack.push(Value::Boolean(false)),
                 OperationCode::Fun => {
-                    let position: CallPosition = reader.fetch()?;
-                    let arity: LocalOffset = reader.fetch()?;
+                    let position: CallPosition = reader.fetch();
+                    let arity: LocalOffset = reader.fetch();
                     let fun = self.gc.allocate(FunctionPointer { position, arity });
-                    self.stack.push(Value::FunctionPointer(fun))?;
+                    self.stack.push(Value::FunctionPointer(fun));
                 }
 
                 // SAFETY: Negate operation can only be applied on numbers. When the operand is
-                // of reference type, an error will be reported instantly, leaving the GC
-                // behavior unimportant. Thus, we don't have to keep the operand on stack before
-                // evaluation.
-                OperationCode::Negate => match self.stack.pop()? {
-                    Value::Number(n) => self.stack.push(Value::Number(-n))?,
-                    _ => bail!("negate operator `-` can only be applied to numbers"),
+                // of reference type, a panic will happen and the VM will soon be terminated,
+                // leaving the GC behavior unimportant. Thus, we don't have to keep the operand
+                // on stack before evaluation.
+                OperationCode::Negate => match self.stack.pop() {
+                    Value::Number(n) => self.stack.push(Value::Number(-n)),
+                    _ => panic!("negate operator `-` can only be applied to numbers"),
                 },
                 OperationCode::Not => {
                     // SAFETY: Not operation indeed can be applied to all value types, including
                     // the reference types. However, whether the converted value true or false
                     // is irrelevant to the validity of the reference, and no dereferencing is
                     // performed. Thus, the value doesn't need to be on stack before evaluation.
-                    let boolean: bool = self.stack.pop()?.as_boolean();
-                    self.stack.push(Value::Boolean(boolean))?;
+                    let boolean: bool = self.stack.pop().as_boolean();
+                    self.stack.push(Value::Boolean(boolean));
                 }
 
                 OperationCode::Add => {
                     // SAFETY: Add operation can be applied to numbers or strings, and the
                     // latter is a reference type. We'll have to keep the reference values on
                     // stack before evaluation since we cannot know when the GC will execute.
-                    let right = self.stack.peek(0)?;
-                    let left = self.stack.peek(1)?;
+                    let right = self.stack.peek(0);
+                    let left = self.stack.peek(1);
                     match (left, right) {
                         (Value::Number(left), Value::Number(right)) => {
                             let sum = Value::Number(left + right);
-                            self.stack.pop()?;
-                            self.stack.pop()?;
-                            self.stack.push(sum)?;
+                            self.stack.pop();
+                            self.stack.pop();
+                            self.stack.push(sum);
                         }
                         (Value::String(left), Value::String(right)) => {
                             let concat = self.gc.allocate(format!("{}{}", **left, **right));
-                            self.stack.pop()?;
-                            self.stack.pop()?;
-                            self.stack.push(Value::String(concat))?;
+                            self.stack.pop();
+                            self.stack.pop();
+                            self.stack.push(Value::String(concat));
                         }
-                        _ => bail!("add operator `+` can only be applied to numbers or strings"),
+                        _ => panic!("add operator `+` can only be applied to numbers or strings"),
                     }
                 }
                 OperationCode::Subtract => arithmetic!(- as Number),
@@ -149,69 +147,69 @@ impl VirtualMachine {
                     // SAFETY: Equal operation can be applied to each kind of values, and
                     // there's reference types. We'll have to keep the reference values on stack
                     // before evaluation since we cannot know when the GC will execute.
-                    let right = self.stack.peek(0)?;
-                    let left = self.stack.peek(1)?;
+                    let right = self.stack.peek(0);
+                    let left = self.stack.peek(1);
                     let equal = Value::Boolean(left == right);
-                    self.stack.pop()?;
-                    self.stack.pop()?;
-                    self.stack.push(equal)?;
+                    self.stack.pop();
+                    self.stack.pop();
+                    self.stack.push(equal);
                 }
                 OperationCode::Greater => arithmetic!(> as Boolean),
                 OperationCode::Less => arithmetic!(< as Boolean),
 
                 OperationCode::SetGlobal => {
-                    let index: GlobalIndex = reader.fetch()?;
-                    self.globals[index as usize] = self.stack.top()?.clone();
+                    let index: GlobalIndex = reader.fetch();
+                    self.globals[index as usize] = self.stack.top().clone();
                 }
                 OperationCode::GetGlobal => {
-                    let index: GlobalIndex = reader.fetch()?;
-                    self.stack.push(self.globals[index as usize].clone())?
+                    let index: GlobalIndex = reader.fetch();
+                    self.stack.push(self.globals[index as usize].clone())
                 }
 
                 OperationCode::GetLocal => {
-                    let offset: LocalOffset = reader.fetch()?;
+                    let offset: LocalOffset = reader.fetch();
                     self.stack
-                        .push(self.stack[(self.frame + offset) as usize].clone())?;
+                        .push(self.stack[(self.frame + offset) as usize].clone());
                 }
                 OperationCode::SetLocal => {
-                    let offset: LocalOffset = reader.fetch()?;
-                    self.stack[(self.frame + offset) as usize] = self.stack.top()?.clone();
+                    let offset: LocalOffset = reader.fetch();
+                    self.stack[(self.frame + offset) as usize] = self.stack.top().clone();
                 }
 
                 // No SAFETY here because the Pop operation means to pop a value out of
                 // stack directly.
-                OperationCode::Pop => drop(self.stack.pop()?),
+                OperationCode::Pop => drop(self.stack.pop()),
 
                 OperationCode::JumpIfFalse => {
-                    let offset: JumpOffset = reader.fetch()?;
-                    let condition: bool = self.stack.top()?.as_boolean();
+                    let offset: JumpOffset = reader.fetch();
+                    let condition: bool = self.stack.top().as_boolean();
                     if condition == false {
-                        reader.jump(offset as isize)?;
+                        reader.jump(offset as isize);
                     }
                 }
                 OperationCode::Jump => {
-                    let offset: JumpOffset = reader.fetch()?;
-                    reader.jump(offset as isize)?;
+                    let offset: JumpOffset = reader.fetch();
+                    reader.jump(offset as isize);
                 }
                 OperationCode::Call => {
-                    let position: CallPosition = reader.fetch()?;
-                    let frame_offset: LocalOffset = reader.fetch()?;
+                    let position: CallPosition = reader.fetch();
+                    let frame_offset: LocalOffset = reader.fetch();
                     let last_frame = CallFrame {
                         position: reader.position() as CallPosition,
                         frame: self.frame,
                     };
                     self.callstack.push(last_frame);
                     self.frame = self.stack.len() as LocalOffset - frame_offset;
-                    reader.seek(position as usize)?;
+                    reader.seek(position as usize);
                 }
-                OperationCode::Invoke => match self.stack.top()? {
+                OperationCode::Invoke => match self.stack.top() {
                     Value::FunctionPointer(f) => {
                         // SAFETY: We get the important part of the function pointer out first,
                         // and pops it out of the stack. It can be GC-ed since we have already
                         // known where to call.
                         let position = f.position;
                         let frame_offset = f.arity;
-                        self.stack.pop()?;
+                        self.stack.pop();
 
                         let last_frame = CallFrame {
                             position: reader.position() as CallPosition,
@@ -219,21 +217,21 @@ impl VirtualMachine {
                         };
                         self.callstack.push(last_frame);
                         self.frame = self.stack.len() as LocalOffset - frame_offset;
-                        reader.seek(position as usize)?;
+                        reader.seek(position as usize);
                     }
-                    _ => bail!("object is not callable"),
+                    _ => panic!("object is not callable"),
                 },
                 OperationCode::Return => {
                     if let Some(last_frame) = self.callstack.pop() {
                         // SAFETY: We don't actually pop the top element out of stack, which may
                         // cause GC bugs. We just clone it and put it onto the position of the
                         // return value, and clears all the other locals.
-                        self.stack[self.frame as usize] = self.stack.top()?.clone();
+                        self.stack[self.frame as usize] = self.stack.top().clone();
                         while self.stack.len() > (self.frame + 1) as usize {
-                            self.stack.pop()?;
+                            self.stack.pop();
                         }
                         self.frame = last_frame.frame;
-                        reader.seek(last_frame.position as usize)?;
+                        reader.seek(last_frame.position as usize);
                     } else {
                         break;
                     }
@@ -242,13 +240,12 @@ impl VirtualMachine {
                 OperationCode::Print => {
                     // SAFETY: Print can be applied on reference types, and thus we must keep
                     // them on stack before printing to prevent GC to collect them.
-                    println!("{}", self.stack.top()?);
-                    self.stack.pop()?;
+                    println!("{}", self.stack.top());
+                    self.stack.pop();
                 }
 
                 OperationCode::Impossible => unreachable!(),
             }
         }
-        Ok(())
     }
 }

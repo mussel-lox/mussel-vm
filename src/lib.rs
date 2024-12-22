@@ -15,8 +15,8 @@ macro_rules! bytecode {
             constants: Vec::new(),
         };
         let mut writer = $crate::bytecode::BytecodeWriter::new(&mut bytecode);
-        $( writer.define($constant)?; )*
-        $( writer.emit($code)?; )*
+        $( writer.define($constant); )*
+        $( writer.emit($code); )*
         bytecode
     }};
 }
