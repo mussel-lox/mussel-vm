@@ -20,7 +20,7 @@ pub type LocalOffset = u8;
 /// The type of the jump offset. It can be negative to indicating jumping backward.
 pub type JumpOffset = i16;
 /// The type representing an absolute index of a function entry.
-pub type CallIndex = u16;
+pub type CallPosition = u16;
 
 /// The operation codes.
 ///
@@ -35,6 +35,9 @@ pub enum OperationCode {
     Nil,
     True,
     False,
+    /// Create a function pointer, according to the following [`CallPosition`] and [`LocalOffset`]
+    /// (arity).
+    Fun,
 
     Negate,
     Not,
@@ -72,10 +75,15 @@ pub enum OperationCode {
     Jump,
     /// Start a new call frame, and instantly jumps to the absolute position.
     ///
-    /// This is a two-operand code. It receives a [`CallIndex`] representing the absolute
+    /// This is a two-operand code. It receives a [`CallPosition`] representing the absolute
     /// position of the function entry, and a [`LocalOffset`] indicating the start of the call
     /// frame from the stack top.
     Call,
+    /// Invokes a function pointer, or a closure.
+    ///
+    /// This is similar to [`OperationCode::Call`], but no operands are needed. This code pops
+    /// the top element of the stack and calls it.
+    Invoke,
     /// Return to the outer function call.
     ///
     /// More specifically, if there is an outer function, the value at the stack top will be

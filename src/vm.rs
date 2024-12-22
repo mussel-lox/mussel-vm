@@ -2,10 +2,10 @@ use anyhow::{bail, Result};
 
 use crate::{
     bytecode::{
-        Bytecode, BytecodeReader, CallIndex, Constant, FetchBytecodeExt, GlobalIndex, JumpOffset,
-        LocalOffset, OperationCode,
+        Bytecode, BytecodeReader, CallPosition, Constant, FetchBytecodeExt, GlobalIndex,
+        JumpOffset, LocalOffset, OperationCode,
     },
-    gc::{Allocate, GarbageCollector},
+    gc::{Allocate, FunctionPointer, GarbageCollector},
     stack::Stack,
     value::Value,
 };
@@ -14,7 +14,7 @@ pub const GLOBALS_CAPACITY: usize = GlobalIndex::MAX as usize + 1;
 pub const LOCALS_CAPACITY: usize = LocalOffset::MAX as usize + 1;
 
 struct CallFrame {
-    position: CallIndex,
+    position: CallPosition,
     frame: LocalOffset,
 }
 
@@ -95,6 +95,12 @@ impl VirtualMachine {
                 OperationCode::Nil => self.stack.push(Value::Nil)?,
                 OperationCode::True => self.stack.push(Value::Boolean(true))?,
                 OperationCode::False => self.stack.push(Value::Boolean(false))?,
+                OperationCode::Fun => {
+                    let position: CallPosition = reader.fetch()?;
+                    let arity: LocalOffset = reader.fetch()?;
+                    let fun = self.gc.allocate(FunctionPointer { position, arity });
+                    self.stack.push(Value::FunctionPointer(fun))?;
+                }
 
                 // SAFETY: Negate operation can only be applied on numbers. When the operand is
                 // of reference type, an error will be reported instantly, leaving the GC
@@ -188,16 +194,35 @@ impl VirtualMachine {
                     reader.jump(offset as isize)?;
                 }
                 OperationCode::Call => {
-                    let index: CallIndex = reader.fetch()?;
+                    let position: CallPosition = reader.fetch()?;
                     let frame_offset: LocalOffset = reader.fetch()?;
                     let last_frame = CallFrame {
-                        position: reader.position() as CallIndex,
+                        position: reader.position() as CallPosition,
                         frame: self.frame,
                     };
                     self.callstack.push(last_frame);
                     self.frame = self.stack.len() as LocalOffset - frame_offset;
-                    reader.seek(index as usize)?;
+                    reader.seek(position as usize)?;
                 }
+                OperationCode::Invoke => match self.stack.top()? {
+                    Value::FunctionPointer(f) => {
+                        // SAFETY: We get the important part of the function pointer out first,
+                        // and pops it out of the stack. It can be GC-ed since we have already
+                        // known where to call.
+                        let position = f.position;
+                        let frame_offset = f.arity;
+                        self.stack.pop()?;
+
+                        let last_frame = CallFrame {
+                            position: reader.position() as CallPosition,
+                            frame: self.frame,
+                        };
+                        self.callstack.push(last_frame);
+                        self.frame = self.stack.len() as LocalOffset - frame_offset;
+                        reader.seek(position as usize)?;
+                    }
+                    _ => bail!("object is not callable"),
+                },
                 OperationCode::Return => {
                     if let Some(last_frame) = self.callstack.pop() {
                         // SAFETY: We don't actually pop the top element out of stack, which may

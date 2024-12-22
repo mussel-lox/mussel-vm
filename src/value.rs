@@ -5,7 +5,7 @@ use std::{
     ptr,
 };
 
-use crate::gc::Reference;
+use crate::gc::{FunctionPointer, Reference};
 
 /// The value types of Mussel VM.
 ///
@@ -17,6 +17,7 @@ pub enum Value {
     Boolean(bool),
     Nil,
     String(Reference<String>),
+    FunctionPointer(Reference<FunctionPointer>),
 }
 
 impl Value {
@@ -36,6 +37,7 @@ impl Hash for Value {
             Value::Boolean(b) => b.hash(state),
             Value::Nil => ptr::null::<()>().hash(state),
             Value::String(s) => s.hash(state),
+            Value::FunctionPointer(f) => f.hash(state),
         }
     }
 }
@@ -52,6 +54,12 @@ impl PartialEq for Value {
                 }
                 s1.deref() == s2.deref()
             }
+            (Value::FunctionPointer(f1), Value::FunctionPointer(f2)) => {
+                if f1 == f2 {
+                    return true;
+                }
+                f1.position == f2.position && f1.arity == f2.arity
+            }
             _ => false,
         }
     }
@@ -64,6 +72,13 @@ impl Display for Value {
             Value::Boolean(b) => b.fmt(f),
             Value::Nil => write!(f, "nil"),
             Value::String(s) => s.deref().fmt(f),
+            Value::FunctionPointer(fun) => {
+                write!(
+                    f,
+                    "<fun position={:#06X} arity={}>",
+                    fun.position, fun.arity
+                )
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use mussel_vm::{
     bytecode,
-    bytecode::{CallIndex, Constant, ConstantIndex, LocalOffset, OperationCode},
+    bytecode::{CallPosition, Constant, ConstantIndex, LocalOffset, OperationCode},
     vm::VirtualMachine,
 };
 
@@ -12,9 +12,11 @@ fn main() -> Result<()> {
             Constant::Number(514.0),
         ]
 
-        OperationCode::Constant; 0 as ConstantIndex;            // print add(114, 514);
+        OperationCode::Fun; 15 as CallPosition; 2 as LocalOffset; // var f = add;
+        OperationCode::Constant; 0 as ConstantIndex;              // f(114, 514);
         OperationCode::Constant; 1 as ConstantIndex;
-        OperationCode::Call; 12 as CallIndex; 2 as LocalOffset;
+        OperationCode::GetLocal; 0 as LocalOffset;
+        OperationCode::Invoke;
         OperationCode::Print;
         OperationCode::Return;
                                                                 // fun add(a, b) {

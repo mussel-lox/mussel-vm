@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
 mod reference;
+mod types;
 
 pub use reference::*;
+pub use types::*;
 
 pub struct GarbageCollector {
     allocations: Vec<Reference<()>>,
@@ -28,6 +30,10 @@ impl Drop for GarbageCollector {
                     AllocationKind::String => {
                         let s: &String = reference.downcast().unwrap();
                         eprint!(" \"{}\"", s);
+                    }
+                    AllocationKind::FunctionPointer => {
+                        let f: &FunctionPointer = reference.downcast().unwrap();
+                        eprint!(" <fun position={:#06X} arity={}>", f.position, f.arity);
                     }
                 }
                 eprintln!();
@@ -56,7 +62,7 @@ impl Allocate<String> for GarbageCollector {
 }
 
 #[allow(unused_macros)]
-macro_rules! spawn_impl {
+macro_rules! allocate_impl {
     ($($variant: ident => $t: ty); * $(;)?) => {
         $(
         impl Allocate<$t> for GarbageCollector {
@@ -68,4 +74,8 @@ macro_rules! spawn_impl {
         }
         )*
     };
+}
+
+allocate_impl! {
+    FunctionPointer => FunctionPointer;
 }
