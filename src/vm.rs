@@ -2,8 +2,8 @@ use anyhow::{bail, Result};
 
 use crate::{
     bytecode::{
-        Bytecode, BytecodeReader, Constant, FetchBytecodeExt, GlobalIndex, JumpOffset, LocalOffset,
-        OperationCode,
+        Bytecode, BytecodeReader, CallIndex, Constant, FetchBytecodeExt, GlobalIndex, JumpOffset,
+        LocalOffset, OperationCode,
     },
     gc::{Allocate, GarbageCollector},
     stack::Stack,
@@ -12,6 +12,11 @@ use crate::{
 
 pub const GLOBALS_CAPACITY: usize = GlobalIndex::MAX as usize + 1;
 pub const LOCALS_CAPACITY: usize = LocalOffset::MAX as usize + 1;
+
+struct CallFrame {
+    position: CallIndex,
+    frame: LocalOffset,
+}
 
 /// The Mussel VM.
 ///
@@ -22,6 +27,8 @@ pub struct VirtualMachine {
     globals: Vec<Value>,
     stack: Stack<Value, LOCALS_CAPACITY>,
     gc: GarbageCollector,
+    frame: LocalOffset,
+    callstack: Vec<CallFrame>,
 }
 
 impl VirtualMachine {
@@ -31,6 +38,8 @@ impl VirtualMachine {
             globals: vec![Value::Nil; GLOBALS_CAPACITY],
             stack: Stack::new(),
             gc: GarbageCollector::new(),
+            frame: 0,
+            callstack: Vec::new(),
         }
     }
 
@@ -40,6 +49,8 @@ impl VirtualMachine {
     pub fn reset(&mut self) {
         self.globals.fill(Value::Nil);
         self.stack.clear();
+        self.frame = 0;
+        self.callstack.clear();
     }
 
     /// Execute the bytecode.
@@ -153,11 +164,12 @@ impl VirtualMachine {
 
                 OperationCode::GetLocal => {
                     let offset: LocalOffset = reader.fetch()?;
-                    self.stack.push(self.stack[offset as usize].clone())?;
+                    self.stack
+                        .push(self.stack[(self.frame + offset) as usize].clone())?;
                 }
                 OperationCode::SetLocal => {
                     let offset: LocalOffset = reader.fetch()?;
-                    self.stack[offset as usize] = self.stack.top()?.clone();
+                    self.stack[(self.frame + offset) as usize] = self.stack.top()?.clone();
                 }
 
                 // No SAFETY here because the Pop operation means to pop a value out of
@@ -175,7 +187,30 @@ impl VirtualMachine {
                     let offset: JumpOffset = reader.fetch()?;
                     reader.jump(offset as isize)?;
                 }
-                OperationCode::Return => break,
+                OperationCode::Call => {
+                    let index: CallIndex = reader.fetch()?;
+                    let frame_offset: LocalOffset = reader.fetch()?;
+                    let last_frame = CallFrame {
+                        position: reader.position() as CallIndex,
+                        frame: self.frame,
+                    };
+                    self.callstack.push(last_frame);
+                    self.frame = self.stack.len() as LocalOffset - frame_offset;
+                    reader.seek(index as usize)?;
+                }
+                OperationCode::Return => {
+                    if let Some(last_frame) = self.callstack.pop() {
+                        let return_value = self.stack.pop()?;
+                        while self.stack.len() > self.frame as usize {
+                            self.stack.pop()?;
+                        }
+                        self.stack.push(return_value)?;
+                        self.frame = last_frame.frame;
+                        reader.seek(last_frame.position as usize)?;
+                    } else {
+                        break;
+                    }
+                }
 
                 OperationCode::Print => {
                     // SAFETY: Print can be applied on reference types, and thus we must keep

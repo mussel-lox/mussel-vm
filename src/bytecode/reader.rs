@@ -1,5 +1,5 @@
 use std::{
-    io::{Cursor, Seek},
+    io::{Cursor, Seek, SeekFrom},
     mem,
 };
 
@@ -29,6 +29,10 @@ impl<'a> BytecodeReader<'a> {
         }
     }
 
+    pub fn position(&self) -> usize {
+        self.cursor.position() as usize
+    }
+
     /// Load a constant if any, reports an [`anyhow::Error`] if index out of bounds.
     pub fn load(&mut self, index: usize) -> Result<Constant> {
         if index >= self.constants.len() {
@@ -39,6 +43,11 @@ impl<'a> BytecodeReader<'a> {
 
     pub fn jump(&mut self, offset: isize) -> Result<()> {
         Ok(self.cursor.seek_relative(offset as i64)?)
+    }
+
+    pub fn seek(&mut self, index: usize) -> Result<()> {
+        self.cursor.seek(SeekFrom::Start(index as u64))?;
+        Ok(())
     }
 }
 

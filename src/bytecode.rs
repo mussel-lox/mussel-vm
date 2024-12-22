@@ -19,6 +19,8 @@ pub type GlobalIndex = u8;
 pub type LocalOffset = u8;
 /// The type of the jump offset. It can be negative to indicating jumping backward.
 pub type JumpOffset = i16;
+/// The type representing an absolute index of a function entry.
+pub type CallIndex = u16;
 
 /// The operation codes.
 ///
@@ -68,6 +70,14 @@ pub enum OperationCode {
     JumpIfFalse,
     /// Instantly jumps according to the following [`JumpOffset`]. There's no conditions to meet.
     Jump,
+    /// Start a new call frame, and instantly jumps to the absolute position.
+    ///
+    /// This is a two-operand code. It receives a [`CallIndex`] representing the absolute
+    /// position of the function entry, and a [`LocalOffset`] indicating the start of the call
+    /// frame from the stack top.
+    Call,
+    /// Preserves the element at stack top, clear the current call frame and jump back to the
+    /// outer function. If there's no outer function (i.e. this is the main function), the VM exits.
     Return,
 
     Print,
