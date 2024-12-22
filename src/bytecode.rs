@@ -76,8 +76,13 @@ pub enum OperationCode {
     /// position of the function entry, and a [`LocalOffset`] indicating the start of the call
     /// frame from the stack top.
     Call,
-    /// Preserves the element at stack top, clear the current call frame and jump back to the
-    /// outer function. If there's no outer function (i.e. this is the main function), the VM exits.
+    /// Return to the outer function call.
+    ///
+    /// More specifically, if there is an outer function, the value at the stack top will be
+    /// preserved as the return value, and all the other local variables will be dropped. The VM
+    /// will jump back to the last function's position and continues to execute it.
+    ///
+    /// If there's no such an outer function (i.e. this is the "main" function), the VM just exits.
     Return,
 
     Print,

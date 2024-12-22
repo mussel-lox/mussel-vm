@@ -8,20 +8,21 @@ use mussel_vm::{
 fn main() -> Result<()> {
     let bytecode = bytecode! {
         const [
-            Constant::String("Hello".into()),
-            Constant::String("World".into()),
+            Constant::Number(114.0),
+            Constant::Number(514.0),
         ]
 
-        OperationCode::Constant; 0 as ConstantIndex;
-        OperationCode::Print;
-        OperationCode::Call; 10 as CallIndex; 0 as LocalOffset;
-        OperationCode::Pop;
-        OperationCode::Return;
-
+        OperationCode::Constant; 0 as ConstantIndex;            // print add(114, 514);
         OperationCode::Constant; 1 as ConstantIndex;
+        OperationCode::Call; 12 as CallIndex; 2 as LocalOffset;
         OperationCode::Print;
-        OperationCode::Nil;
         OperationCode::Return;
+                                                                // fun add(a, b) {
+        OperationCode::GetLocal; 0 as LocalOffset;              //      return a + b;
+        OperationCode::GetLocal; 1 as LocalOffset;
+        OperationCode::Add;
+        OperationCode::Return;
+                                                                // }
     };
 
     let mut vm = VirtualMachine::new();

@@ -200,11 +200,13 @@ impl VirtualMachine {
                 }
                 OperationCode::Return => {
                     if let Some(last_frame) = self.callstack.pop() {
-                        let return_value = self.stack.pop()?;
-                        while self.stack.len() > self.frame as usize {
+                        // SAFETY: We don't actually pop the top element out of stack, which may
+                        // cause GC bugs. We just clone it and put it onto the position of the
+                        // return value, and clears all the other locals.
+                        self.stack[self.frame as usize] = self.stack.top()?.clone();
+                        while self.stack.len() > (self.frame + 1) as usize {
                             self.stack.pop()?;
                         }
-                        self.stack.push(return_value)?;
                         self.frame = last_frame.frame;
                         reader.seek(last_frame.position as usize)?;
                     } else {
