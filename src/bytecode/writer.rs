@@ -3,13 +3,13 @@ use std::{collections::HashMap, io::Cursor};
 use anyhow::{bail, Result};
 use byteorder::WriteBytesExt;
 
-use crate::bytecode::{Bytecode, Constant, ConstantIndex, OperationCode, ENDIANNESS};
+use crate::bytecode::{Bytecode, Constant, ConstantIndex, Endianness, OperationCode};
 
 /// A shallow encapsulation of [`Bytecode`].
 ///
 /// Supported data (e.g. [`OperationCode`], `u16`, etc.) can be written into bytecode conveniently,
 /// without considering the endianness and how they are turned into `u8` bytes. Internally,
-/// [`Cursor`] from the standard library is used and [`ENDIANNESS`] is adopted.
+/// [`Cursor`] from the standard library is used and [`Endianness`] is adopted.
 ///
 /// Moreover, constant caching is implemented. If a constant is [`BytecodeWriter::define`]-ed
 /// before, it will not be defined again when calling the same function, and its index will be
@@ -56,17 +56,17 @@ impl<'a> BytecodeWriter<'a> {
 ///
 /// User does not need to call different methods when emitting different types into [`Bytecode`].
 /// Just call `emit(...)` and let the compiler handles it.
-pub trait EmitBytecodeExt<T> {
+pub trait Emit<T> {
     fn emit(&mut self, value: T) -> Result<()>;
 }
 
-impl EmitBytecodeExt<OperationCode> for BytecodeWriter<'_> {
+impl Emit<OperationCode> for BytecodeWriter<'_> {
     fn emit(&mut self, value: OperationCode) -> Result<()> {
         Ok(self.cursor.write_u8(value as u8)?)
     }
 }
 
-impl EmitBytecodeExt<u8> for BytecodeWriter<'_> {
+impl Emit<u8> for BytecodeWriter<'_> {
     fn emit(&mut self, value: u8) -> Result<()> {
         Ok(self.cursor.write_u8(value)?)
     }
@@ -76,9 +76,9 @@ macro_rules! emit_primitives_impl {
     ($($t: ty), *) => {
         paste::paste! {
             $(
-            impl EmitBytecodeExt<$t> for BytecodeWriter<'_> {
+            impl Emit<$t> for BytecodeWriter<'_> {
                 fn emit(&mut self, value: $t) -> Result<()> {
-                    Ok(self.cursor.[<write_ $t>]::<ENDIANNESS>(value)?)
+                    Ok(self.cursor.[<write_ $t>]::<Endianness>(value)?)
                 }
             }
             )*

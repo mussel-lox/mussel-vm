@@ -9,7 +9,7 @@ pub use reader::*;
 pub use writer::*;
 
 /// The endianness of bytecode. Used in [`BytecodeReader`] and [`BytecodeWriter`].
-pub type ENDIANNESS = LittleEndian;
+pub type Endianness = LittleEndian;
 /// The type of constant index in a [`Bytecode`]. Defined using typedef to deal with possible changes in
 /// the future.
 pub type ConstantIndex = u16;

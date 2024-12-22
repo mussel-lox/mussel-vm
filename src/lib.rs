@@ -8,7 +8,7 @@ pub mod vm;
 #[macro_export]
 macro_rules! bytecode {
     (const [$($constant: expr), * $(,)?] $($code: expr); * $(;)?) => {{
-        use $crate::bytecode::EmitBytecodeExt;
+        use $crate::bytecode::Emit;
 
         let mut bytecode = $crate::bytecode::Bytecode {
             code: Vec::new(),

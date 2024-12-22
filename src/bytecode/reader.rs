@@ -6,7 +6,7 @@ use std::{
 use anyhow::{bail, Result};
 use byteorder::ReadBytesExt;
 
-use crate::bytecode::{Bytecode, Constant, OperationCode, ENDIANNESS};
+use crate::bytecode::{Bytecode, Constant, Endianness, OperationCode};
 
 /// A shallow encapsulation of [`Bytecode`].
 ///
@@ -56,11 +56,11 @@ impl<'a> BytecodeReader<'a> {
 /// User does not need to call different methods when fetching operation codes or operands in
 /// different types. Just call `fetch()` (with type annotations usually) and let the compiler
 /// handles it.
-pub trait FetchBytecodeExt<T> {
+pub trait Fetch<T> {
     fn fetch(&mut self) -> Result<T>;
 }
 
-impl FetchBytecodeExt<OperationCode> for BytecodeReader<'_> {
+impl Fetch<OperationCode> for BytecodeReader<'_> {
     fn fetch(&mut self) -> Result<OperationCode> {
         let candidate = self.cursor.read_u8()?;
         if candidate >= OperationCode::Impossible as u8 {
@@ -70,7 +70,7 @@ impl FetchBytecodeExt<OperationCode> for BytecodeReader<'_> {
     }
 }
 
-impl FetchBytecodeExt<u8> for BytecodeReader<'_> {
+impl Fetch<u8> for BytecodeReader<'_> {
     fn fetch(&mut self) -> Result<u8> {
         Ok(self.cursor.read_u8()?)
     }
@@ -80,9 +80,9 @@ macro_rules! fetch_primitives_impl {
     ($($t: ty), *) => {
         paste::paste! {
             $(
-            impl FetchBytecodeExt<$t> for BytecodeReader<'_> {
+            impl Fetch<$t> for BytecodeReader<'_> {
                 fn fetch(&mut self) -> Result<$t> {
-                    Ok(self.cursor.[<read_ $t>]::<ENDIANNESS>()?)
+                    Ok(self.cursor.[<read_ $t>]::<Endianness>()?)
                 }
             }
             )*

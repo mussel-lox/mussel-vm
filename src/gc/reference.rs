@@ -121,7 +121,6 @@ pub trait Downcast<T> {
 macro_rules! register_allowed_types {
     ($($variant: ident => $t: ty); * $(;)?) => {
         /// The metadata to recognize the actual type of an allocation.
-        #[repr(C)]
         #[derive(Debug, Clone, Copy)]
         pub enum AllocationKind {
             $($variant), *
@@ -132,7 +131,6 @@ macro_rules! register_allowed_types {
 
         impl Downcast<$t> for Reference<()> {
             fn downcast(&self) -> Option<&$t> {
-                #[allow(unreachable_patterns)]
                 match self.kind() {
                     AllocationKind::$variant => {
                         let reference = unsafe { self.cast::<$t>() };
@@ -143,7 +141,6 @@ macro_rules! register_allowed_types {
             }
 
             fn downcast_mut(&mut self) -> Option<&mut $t> {
-                #[allow(unreachable_patterns)]
                 match self.kind() {
                     AllocationKind::$variant => {
                         let mut reference = unsafe { self.cast::<$t>() };

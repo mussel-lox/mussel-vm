@@ -2,8 +2,8 @@ use anyhow::{bail, Result};
 
 use crate::{
     bytecode::{
-        Bytecode, BytecodeReader, CallPosition, Constant, FetchBytecodeExt, GlobalIndex,
-        JumpOffset, LocalOffset, OperationCode,
+        Bytecode, BytecodeReader, CallPosition, Constant, Fetch, GlobalIndex, JumpOffset,
+        LocalOffset, OperationCode,
     },
     gc::{Allocate, FunctionPointer, GarbageCollector},
     stack::Stack,
