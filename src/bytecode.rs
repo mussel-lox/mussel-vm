@@ -29,8 +29,8 @@ pub type CallPosition = u16;
 /// source code level (e.g. control flows) are implemented by several kinds of jump instructions.
 #[repr(u8)]
 pub enum OperationCode {
-    /// Load a constant into the VM stack, with its index stored as `u16` following the operation
-    /// code.
+    /// Load a constant into the VM stack, with its index stored as [`ConstantIndex`] following
+    /// the operation code.
     Constant,
     Nil,
     True,
@@ -66,6 +66,16 @@ pub enum OperationCode {
     SetLocal,
     /// Simply pops and drops the top element of the stack.
     Pop,
+
+    /// Create a closure object based on a [`CallPosition`] and the arity in [`LocalOffset`] type.
+    Closure,
+    /// Box a value on stack with position [`LocalOffset`] as upvalue if never boxed, and bind it
+    /// to the closure object at the stack top.
+    Capture,
+    /// Get an upvalue at a certain position in [`LocalOffset`] type of the current closure.
+    GetUpvalue,
+    /// Sets the value at the stack top to the upvalue at position in [`LocalOffset`] type.
+    SetUpvalue,
 
     /// Jumps according to the following [`JumpOffset`] if the top element of the current stack
     /// can be evaluated as false. The offset can be positive or negative, in order to jump

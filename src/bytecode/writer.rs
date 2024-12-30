@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Cursor};
+use std::io::Cursor;
 
 use byteorder::WriteBytesExt;
 
@@ -9,14 +9,9 @@ use crate::bytecode::{Bytecode, Constant, ConstantIndex, Endianness, OperationCo
 /// Supported data (e.g. [`OperationCode`], `u16`, etc.) can be written into bytecode conveniently,
 /// without considering the endianness and how they are turned into `u8` bytes. Internally,
 /// [`Cursor`] from the standard library is used and [`Endianness`] is adopted.
-///
-/// Moreover, constant caching is implemented. If a constant is [`BytecodeWriter::define`]-ed
-/// before, it will not be defined again when calling the same function, and its index will be
-/// returned directly.
 pub struct BytecodeWriter<'a> {
     cursor: Cursor<&'a mut Vec<u8>>,
     constants: &'a mut Vec<Constant>,
-    constant_cache: HashMap<Constant, ConstantIndex>,
 }
 
 impl<'a> BytecodeWriter<'a> {
@@ -28,25 +23,17 @@ impl<'a> BytecodeWriter<'a> {
         Self {
             cursor: Cursor::new(&mut bytecode.code),
             constants: &mut bytecode.constants,
-            constant_cache: HashMap::new(),
         }
     }
 
-    /// Define a constant, returning its index.
-    ///
-    /// Note that constant caching is implemented, which means the index of an existing constant
-    /// will be directly returned without writing it twice in the constant section of [`Bytecode`].
+    /// Define a constant, returning its [`ConstantIndex`].
     pub fn define(&mut self, constant: Constant) -> ConstantIndex {
-        if let Some(index) = self.constant_cache.get(&constant) {
-            return *index;
-        }
         // Define a new constant.
         if self.constants.len() > ConstantIndex::MAX as usize {
             panic!("too many constants");
         }
         let index = self.constants.len() as ConstantIndex;
-        self.constants.push(constant.clone());
-        self.constant_cache.insert(constant, index);
+        self.constants.push(constant);
         index
     }
 }

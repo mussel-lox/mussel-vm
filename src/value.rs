@@ -1,8 +1,8 @@
 use std::{
     fmt::{Display, Formatter},
-    hash::{Hash, Hasher},
-    ops::Deref,
-    ptr,
+    hash::Hash,
+    ops::Deref
+    ,
 };
 
 use crate::gc::{FunctionPointer, Reference};
@@ -26,18 +26,6 @@ impl Value {
             Value::Boolean(b) => *b,
             Value::Nil => false,
             _ => true,
-        }
-    }
-}
-
-impl Hash for Value {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Value::Number(n) => n.to_bits().hash(state),
-            Value::Boolean(b) => b.hash(state),
-            Value::Nil => ptr::null::<()>().hash(state),
-            Value::String(s) => s.hash(state),
-            Value::FunctionPointer(f) => f.hash(state),
         }
     }
 }
