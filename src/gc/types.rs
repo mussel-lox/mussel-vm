@@ -12,6 +12,7 @@ pub struct FunctionPointer {
 
 pub type Upvalue = Reference<Value>;
 
+#[derive(Debug)]
 pub struct Closure {
     pub position: CallPosition,
     pub arity: LocalOffset,

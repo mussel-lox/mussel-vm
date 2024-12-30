@@ -1,9 +1,11 @@
+use std::mem;
+
 use crate::{
     bytecode::{
         Bytecode, BytecodeReader, CallPosition, Constant, ConstantIndex, Fetch, GlobalIndex,
         JumpOffset, LocalOffset, OperationCode,
     },
-    gc::{Allocate, FunctionPointer, GarbageCollector},
+    gc::{Allocate, Closure, FunctionPointer, GarbageCollector, Reference},
     stack::Stack,
     value::Value,
 };
@@ -14,6 +16,7 @@ pub const LOCALS_CAPACITY: usize = LocalOffset::MAX as usize + 1;
 struct CallFrame {
     position: CallPosition,
     frame: LocalOffset,
+    closure: Option<Reference<Closure>>,
 }
 
 /// The Mussel VM.
@@ -26,6 +29,7 @@ pub struct VirtualMachine {
     stack: Stack<Value, LOCALS_CAPACITY>,
     gc: GarbageCollector,
     frame: LocalOffset,
+    closure: Option<Reference<Closure>>,
     callstack: Vec<CallFrame>,
 }
 
@@ -37,6 +41,7 @@ impl VirtualMachine {
             stack: Stack::new(),
             gc: GarbageCollector::new(),
             frame: 0,
+            closure: None,
             callstack: Vec::new(),
         }
     }
@@ -180,6 +185,53 @@ impl VirtualMachine {
                 // stack directly.
                 OperationCode::Pop => drop(self.stack.pop()),
 
+                OperationCode::Closure => {
+                    let position: CallPosition = reader.fetch();
+                    let arity: LocalOffset = reader.fetch();
+                    let closure = self.gc.allocate(Closure {
+                        position,
+                        arity,
+                        upvalues: Vec::new(),
+                    });
+                    self.stack.push(Value::Closure(closure));
+                }
+                OperationCode::Capture => {
+                    let offset: LocalOffset = reader.fetch();
+                    let value = self.stack[(self.frame + offset) as usize].clone();
+                    let mut closure = match self.stack.top() {
+                        Value::Closure(closure) => *closure,
+                        _ => panic!("trying to capture value without closure at the stack top"),
+                    };
+
+                    if let Value::Upvalue(upvalue) = value {
+                        closure.upvalues.push(upvalue);
+                    } else {
+                        let upvalue = self.gc.allocate(value);
+                        self.stack[(self.frame + offset) as usize] = Value::Upvalue(upvalue);
+                        closure.upvalues.push(upvalue);
+                    }
+                }
+                OperationCode::GetUpvalue => {
+                    let offset: LocalOffset = reader.fetch();
+                    let closure = match self.closure {
+                        Some(closure) => closure,
+                        None => panic!("trying to get upvalue outside a closure"),
+                    };
+                    self.stack
+                        .push(Value::Upvalue(closure.upvalues[offset as usize]));
+                }
+                OperationCode::SetUpvalue => {
+                    let offset: LocalOffset = reader.fetch();
+                    let closure = match self.closure {
+                        Some(closure) => closure,
+                        None => panic!("trying to set upvalue outside a closure"),
+                    };
+                    let mut upvalue = closure.upvalues[offset as usize];
+                    let value = self.stack.top().clone();
+                    *upvalue = value;
+                    self.stack.pop();
+                }
+
                 OperationCode::JumpIfFalse => {
                     let offset: JumpOffset = reader.fetch();
                     let condition: bool = self.stack.top().as_boolean();
@@ -197,6 +249,7 @@ impl VirtualMachine {
                     let last_frame = CallFrame {
                         position: reader.position() as CallPosition,
                         frame: self.frame,
+                        closure: mem::replace(&mut self.closure, None),
                     };
                     self.callstack.push(last_frame);
                     self.frame = self.stack.len() as LocalOffset - frame_offset;
@@ -214,9 +267,29 @@ impl VirtualMachine {
                         let last_frame = CallFrame {
                             position: reader.position() as CallPosition,
                             frame: self.frame,
+                            closure: mem::replace(&mut self.closure, None),
                         };
                         self.callstack.push(last_frame);
                         self.frame = self.stack.len() as LocalOffset - frame_offset;
+                        reader.seek(position as usize);
+                    }
+                    Value::Closure(c) => {
+                        // SAFETY: We get the important part of the function pointer out first,
+                        // and pops it out of the stack. It can be GC-ed since we have already
+                        // known where to call.
+                        let position = c.position;
+                        let frame_offset = c.arity;
+                        let closure = *c;
+                        self.stack.pop();
+
+                        let last_frame = CallFrame {
+                            position: reader.position() as CallPosition,
+                            frame: self.frame,
+                            closure: mem::replace(&mut self.closure, None),
+                        };
+                        self.callstack.push(last_frame);
+                        self.frame = self.stack.len() as LocalOffset - frame_offset;
+                        self.closure = Some(closure);
                         reader.seek(position as usize);
                     }
                     _ => panic!("object is not callable"),
@@ -231,6 +304,7 @@ impl VirtualMachine {
                             self.stack.pop();
                         }
                         self.frame = last_frame.frame;
+                        self.closure = last_frame.closure;
                         reader.seek(last_frame.position as usize);
                     } else {
                         break;

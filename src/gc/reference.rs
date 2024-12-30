@@ -5,7 +5,10 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::gc::FunctionPointer;
+use crate::{
+    gc::{Closure, FunctionPointer},
+    value::Value,
+};
 
 /// Helper trait to limit a generic type parameter to a range of GC allowed allocation types.
 pub(super) trait AllowedAllocationType {}
@@ -181,5 +184,7 @@ macro_rules! register_allowed_types {
 
 register_allowed_types! {
     String => String;
-    FunctionPointer => FunctionPointer;
+    Function => FunctionPointer;
+    Closure => Closure;
+    Upvalue => Value;
 }

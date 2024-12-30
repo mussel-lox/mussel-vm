@@ -6,6 +6,8 @@ mod types;
 pub use reference::*;
 pub use types::*;
 
+use crate::value::Value;
+
 pub struct GarbageCollector {
     allocations: Vec<Reference<()>>,
     string_pool: HashMap<String, usize>,
@@ -25,17 +27,31 @@ impl Drop for GarbageCollector {
         for reference in &mut self.allocations {
             #[cfg(feature = "gc-trace")]
             {
-                eprint!("=== GC Trace === Dropped <reference at {:p}>", reference);
-                match reference.kind() {
-                    AllocationKind::String => {
-                        let s: &String = reference.downcast().unwrap();
-                        eprint!(" \"{}\"", s);
-                    }
-                    AllocationKind::FunctionPointer => {
-                        let f: &FunctionPointer = reference.downcast().unwrap();
-                        eprint!(" <fun position={:#06X} arity={}>", f.position, f.arity);
-                    }
+                macro_rules! trace_reference {
+                    (
+                        $r: expr,
+                        $($variant: ident <$typ: ident $name: ident> => ($($e:expr), +)); *
+                        $(;)?
+                    ) => {
+                        match $r.kind() {
+                            $(
+                            AllocationKind::$variant => {
+                                let $name: &$typ = $r.downcast().unwrap();
+                                eprint!($($e), *);
+                            }
+                            )*
+                        }
+                    };
                 }
+
+                eprint!("=== GC Trace === Dropped <reference at {:p}>", reference);
+                trace_reference!(
+                    reference,
+                    String   <String s>          => (" \"{}\"", s);
+                    Function <FunctionPointer f> => (" <fun position={:#06X} arity={}>", f.position, f.arity);
+                    Closure  <Closure c>         => (" <closure position={:#06X} arity={}>", c.position, c.arity);
+                    Upvalue  <Value v>           => (" <upvalue {}>", v);
+                );
                 eprintln!();
             }
             unsafe { reference.finalize() };
@@ -77,5 +93,7 @@ macro_rules! allocate_impl {
 }
 
 allocate_impl! {
-    FunctionPointer => FunctionPointer;
+    Function => FunctionPointer;
+    Closure => Closure;
+    Upvalue => Value;
 }

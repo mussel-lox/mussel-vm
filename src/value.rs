@@ -1,11 +1,9 @@
 use std::{
     fmt::{Display, Formatter},
-    hash::Hash,
-    ops::Deref
-    ,
+    ops::Deref,
 };
 
-use crate::gc::{FunctionPointer, Reference};
+use crate::gc::{Closure, FunctionPointer, Reference, Upvalue};
 
 /// The value types of Mussel VM.
 ///
@@ -18,6 +16,8 @@ pub enum Value {
     Nil,
     String(Reference<String>),
     FunctionPointer(Reference<FunctionPointer>),
+    Closure(Reference<Closure>),
+    Upvalue(Upvalue),
 }
 
 impl Value {
@@ -48,6 +48,8 @@ impl PartialEq for Value {
                 }
                 f1.position == f2.position && f1.arity == f2.arity
             }
+            (Value::Closure(c1), Value::Closure(c2)) => c1 == c2,
+            (Value::Upvalue(u1), Value::Upvalue(u2)) => u1 == u2,
             _ => false,
         }
     }
@@ -67,6 +69,12 @@ impl Display for Value {
                     fun.position, fun.arity
                 )
             }
+            Value::Closure(c) => write!(
+                f,
+                "<closure position={:#06X} arity={}>",
+                c.position, c.arity
+            ),
+            Value::Upvalue(u) => u.deref().fmt(f),
         }
     }
 }
