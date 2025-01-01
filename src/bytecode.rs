@@ -48,12 +48,12 @@ pub enum OperationCode {
     Greater,
     Less,
 
-    /// Pops the top element of the stack, and sets it as a global state (i.e. variable) with its index in
-    /// [`GlobalIndex`] type.
-    SetGlobal,
     /// Gets the specified global variable, and push it into the stack. Same as the `SetGlobal` operation code, this
     /// code is followed by a [`GlobalIndex`].
     GetGlobal,
+    /// Pops the top element of the stack, and sets it as a global state (i.e. variable) with its index in
+    /// [`GlobalIndex`] type.
+    SetGlobal,
 
     /// Gets the specified slot of stack and pushes the value at the top of it. This code is followed by a
     /// [`LocalOffset`], which is an offset starts from the current call frame.

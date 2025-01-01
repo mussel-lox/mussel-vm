@@ -1,4 +1,4 @@
-use std::mem;
+use std::{mem, ops::Deref};
 
 use crate::{
     bytecode::{
@@ -63,17 +63,13 @@ impl VirtualMachine {
         let mut reader = BytecodeReader::new(bytecode);
         macro_rules! arithmetic {
             ($operator: tt as $variant: ident) => {{
-                // SAFETY: Theoretically, arithmetic operations can only be applied to numbers. However, since we've
-                // introduced upvalues (which is a boxed value) to implement closure feature, we'll have to leave the
-                // operands on the stack before we evaluate them. Otherwise, the upvalue may be collected by GC and
-                // cause invalid deferencing.
-                let right = self.stack.peek(0).unbox();
-                let left = self.stack.peek(1).unbox();
+                // SAFETY: Arithmetic operations can only be applied to numbers, so if there's an operand of a
+                // certain reference type, the VM will instantly panic, leaving the GC behavior unimportant.
+                let right = self.stack.pop();
+                let left = self.stack.pop();
                 match (left, right) {
                     (Value::Number(left), Value::Number(right)) => {
-                        let result = Value::$variant(*left $operator *right);
-                        self.stack.pop();
-                        self.stack.pop();
+                        let result = Value::$variant(left $operator right);
                         self.stack.push(result);
                     }
                     _ => panic!(
@@ -107,31 +103,26 @@ impl VirtualMachine {
                     self.stack.push(Value::FunctionPointer(fun));
                 }
 
-                OperationCode::Negate => {
-                    // SAFETY: Theoretically, negate operation can only be applied to numbers. However, upvalues are
-                    // introduced to implement closure feature, so we'll need to keep them on stack before we
-                    // evaluate them.
-                    let value = match self.stack.top().unbox() {
-                        Value::Number(n) => *n,
-                        _ => panic!("negate operator `-` can only be applied to numbers"),
-                    };
-                    self.stack.pop();
-                    self.stack.push(Value::Number(-value));
-                }
+                // SAFETY: Negate operation can only be applied to numbers, so if there's an operand of a certain
+                // reference type, the VM will instantly panic, leaving the GC behavior unimportant.
+                OperationCode::Negate => match self.stack.pop() {
+                    Value::Number(n) => self.stack.push(Value::Number(-n)),
+                    _ => panic!("negate operator `-` can only be applied to numbers"),
+                },
+
+                // SAFETY: Logical not operation can be applied to all kinds of types, including the reference types.
+                // However, it does not do dereferencing, so the operand can be GC-ed.
                 OperationCode::Not => {
-                    // Logical not operator can be applied to all types without panicking. The `as_boolean` does
-                    // automatic unboxing for us, and we just need to keep the value on stack.
-                    let value = self.stack.top().as_boolean();
-                    self.stack.pop();
+                    let value = self.stack.pop().as_boolean();
                     self.stack.push(Value::Boolean(!value));
                 }
 
                 OperationCode::Add => {
-                    // SAFETY: Add operation can be applied to numbers or strings, and the latter is a reference type
-                    // . We'll have to keep the reference values on stack before evaluation since we cannot know when
+                    // SAFETY: Add operation can be applied to numbers or strings, and the latter is a reference type.
+                    // We'll have to keep the reference values on stack before evaluation since we cannot know when
                     // the GC will execute.
-                    let right = self.stack.peek(0).unbox();
-                    let left = self.stack.peek(1).unbox();
+                    let right = self.stack.peek(0);
+                    let left = self.stack.peek(1);
                     match (left, right) {
                         (Value::Number(left), Value::Number(right)) => {
                             let sum = Value::Number(left + right);
@@ -154,10 +145,9 @@ impl VirtualMachine {
 
                 OperationCode::Equal => {
                     // SAFETY: Equal operation can be applied to each kind of values, and there's reference types.
-                    // We'll have to keep the reference values on stack before evaluation since we cannot know when
-                    // the GC will execute.
-                    //
-                    // The overloaded [`PartialEq`] automatically handles unboxing for us.
+                    // Besides, the overloaded [`PartialEq`] operator actually does do dereferencing, so we'll have
+                    // to keep the reference values on stack before evaluation since we cannot know when the GC will
+                    // execute.
                     let right = self.stack.peek(0);
                     let left = self.stack.peek(1);
                     let equal = Value::Boolean(left == right);
@@ -168,9 +158,19 @@ impl VirtualMachine {
                 OperationCode::Greater => arithmetic!(> as Boolean),
                 OperationCode::Less => arithmetic!(< as Boolean),
 
+                OperationCode::GetGlobal => {
+                    let index: GlobalIndex = reader.fetch();
+                    let variable = &self.globals[index as usize];
+                    let value = if let Value::Upvalue(u) = variable {
+                        u.deref().clone()
+                    } else {
+                        variable.clone()
+                    };
+                    self.stack.push(value);
+                }
                 OperationCode::SetGlobal => {
                     let index: GlobalIndex = reader.fetch();
-                    let value = self.stack.top().unbox().clone();
+                    let value = self.stack.top().clone();
                     let target = &mut self.globals[index as usize];
                     if let Value::Upvalue(u) = target {
                         **u = value;
@@ -178,19 +178,20 @@ impl VirtualMachine {
                         *target = value;
                     }
                 }
-                OperationCode::GetGlobal => {
-                    let index: GlobalIndex = reader.fetch();
-                    self.stack.push(self.globals[index as usize].clone())
-                }
 
                 OperationCode::GetLocal => {
                     let offset: LocalOffset = reader.fetch();
-                    self.stack
-                        .push(self.stack[(self.frame + offset) as usize].clone());
+                    let variable = &self.stack[(self.frame + offset) as usize];
+                    let value = if let Value::Upvalue(u) = variable {
+                        u.deref().clone()
+                    } else {
+                        variable.clone()
+                    };
+                    self.stack.push(value);
                 }
                 OperationCode::SetLocal => {
                     let offset: LocalOffset = reader.fetch();
-                    let value = self.stack.top().unbox().clone();
+                    let value = self.stack.top().clone();
                     let target = &mut self.stack[(self.frame + offset) as usize];
                     if let Value::Upvalue(u) = target {
                         **u = value
@@ -235,8 +236,8 @@ impl VirtualMachine {
                         Some(closure) => closure,
                         None => panic!("trying to get upvalue outside a closure"),
                     };
-                    self.stack
-                        .push(Value::Upvalue(closure.upvalues[offset as usize]));
+                    let value = closure.upvalues[offset as usize].deref().clone();
+                    self.stack.push(value);
                 }
                 OperationCode::SetUpvalue => {
                     let offset: LocalOffset = reader.fetch();
@@ -245,7 +246,7 @@ impl VirtualMachine {
                         None => panic!("trying to set upvalue outside a closure"),
                     };
                     let mut upvalue = closure.upvalues[offset as usize];
-                    let value = self.stack.top().unbox().clone();
+                    let value = self.stack.top().clone();
                     *upvalue = value;
                 }
 
@@ -272,7 +273,7 @@ impl VirtualMachine {
                     self.frame = self.stack.len() as LocalOffset - frame_offset;
                     reader.seek(position as usize);
                 }
-                OperationCode::Invoke => match self.stack.top().unbox() {
+                OperationCode::Invoke => match self.stack.top() {
                     Value::FunctionPointer(f) => {
                         // SAFETY: We get the important part of the function pointer out first, and pops it out of
                         // the stack. It can be GC-ed since we have already known where to call.
