@@ -10,11 +10,9 @@ pub struct FunctionPointer {
     pub arity: LocalOffset,
 }
 
-pub type Upvalue = Reference<Value>;
-
 #[derive(Debug)]
 pub struct Closure {
     pub position: CallPosition,
     pub arity: LocalOffset,
-    pub upvalues: Vec<Upvalue>,
+    pub upvalues: Vec<Reference<Value>>,
 }

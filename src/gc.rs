@@ -44,13 +44,13 @@ impl Drop for GarbageCollector {
                     };
                 }
 
-                eprint!("=== GC Trace === Dropped <reference at {:p}>", reference);
+                eprint!("=== GC Trace === Dropped <reference at {:p}> ", reference);
                 trace_reference!(
                     reference,
-                    String   <String s>          => (" \"{}\"", s);
-                    Function <FunctionPointer f> => (" <fun position={:#06X} arity={}>", f.position, f.arity);
-                    Closure  <Closure c>         => (" <closure position={:#06X} arity={}>", c.position, c.arity);
-                    Upvalue  <Value v>           => (" <upvalue {}>", v);
+                    String   <String s>          => ("\"{}\"", s);
+                    Function <FunctionPointer f> => ("<fun position={:#06X} arity={}>", f.position, f.arity);
+                    Closure  <Closure c>         => ("<closure position={:#06X} arity={}>", c.position, c.arity);
+                    Upvalue  <Value v>           => ("<upvalue {}>", v);
                 );
                 eprintln!();
             }

@@ -3,12 +3,12 @@ use std::{
     ops::Deref,
 };
 
-use crate::gc::{Closure, FunctionPointer, Reference, Upvalue};
+use crate::gc::{Closure, FunctionPointer, Reference};
 
 /// The value types of Mussel VM.
 ///
-/// Mussel VM is (at least, originally) designed for the Lox language, thus the Lox types are
-/// supported: numbers, strings, booleans, nil and object types.
+/// Mussel VM is (at least, originally) designed for the Lox language, thus the Lox types are supported: numbers,
+/// strings, booleans, nil and object types.
 #[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
@@ -17,7 +17,7 @@ pub enum Value {
     String(Reference<String>),
     FunctionPointer(Reference<FunctionPointer>),
     Closure(Reference<Closure>),
-    Upvalue(Upvalue),
+    Upvalue(Reference<Value>),
 }
 
 impl Value {
