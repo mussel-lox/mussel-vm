@@ -6,9 +6,9 @@ use crate::bytecode::{Bytecode, Constant, ConstantIndex, Endianness, OperationCo
 
 /// A shallow encapsulation of [`Bytecode`].
 ///
-/// Supported data (e.g. [`OperationCode`], `u16`, etc.) can be written into bytecode conveniently,
-/// without considering the endianness and how they are turned into `u8` bytes. Internally,
-/// [`Cursor`] from the standard library is used and [`Endianness`] is adopted.
+/// Supported data (e.g. [`OperationCode`], `u16`, etc.) can be written into bytecode conveniently, without
+/// considering the endianness and how they are turned into `u8` bytes. Internally, [`Cursor`] from the standard
+/// library is used and [`Endianness`] is adopted.
 pub struct BytecodeWriter<'a> {
     cursor: Cursor<&'a mut Vec<u8>>,
     constants: &'a mut Vec<Constant>,
@@ -17,8 +17,8 @@ pub struct BytecodeWriter<'a> {
 impl<'a> BytecodeWriter<'a> {
     /// Create a BytecodeWriter.
     ///
-    /// BytecodeWriter does not own a [`Bytecode`], it just borrows one, in order to reduce
-    /// unnecessary moving and improve performance.
+    /// BytecodeWriter does not own a [`Bytecode`], it just borrows one, in order to reduce unnecessary moving and
+    /// improve performance.
     pub fn new(bytecode: &'a mut Bytecode) -> Self {
         Self {
             cursor: Cursor::new(&mut bytecode.code),
@@ -40,8 +40,8 @@ impl<'a> BytecodeWriter<'a> {
 
 /// Helper trait to write bytecode conveniently.
 ///
-/// User does not need to call different methods when emitting different types into [`Bytecode`].
-/// Just call `emit(...)` and let the compiler handles it.
+/// User does not need to call different methods when emitting different types into [`Bytecode`]. Just call
+/// `emit(...)` and let the compiler handles it.
 pub trait Emit<T> {
     fn emit(&mut self, value: T);
 }

@@ -9,8 +9,8 @@ use crate::bytecode::{Bytecode, Constant, Endianness, OperationCode};
 
 /// A shallow encapsulation of [`Bytecode`].
 ///
-/// For operation codes and operands, just call `fetch()`. The offset, endianness and type
-/// conversion is considered internally. For constants, just call `load()`.
+/// For operation codes and operands, just call `fetch()`. The offset, endianness and type conversion is considered
+/// internally. For constants, just call `load()`.
 pub struct BytecodeReader<'a> {
     cursor: Cursor<&'a Vec<u8>>,
     constants: &'a Vec<Constant>,
@@ -19,8 +19,8 @@ pub struct BytecodeReader<'a> {
 impl<'a> BytecodeReader<'a> {
     /// Create a BytecodeReader.
     ///
-    /// BytecodeReader immutably borrows a [`Bytecode`]. That should be easy to optimize and thus
-    /// get performance improvements for Rust compiler.
+    /// BytecodeReader immutably borrows a [`Bytecode`]. That should be easy to optimize and thus get performance
+    /// improvements for Rust compiler.
     pub fn new(bytecode: &'a Bytecode) -> Self {
         Self {
             cursor: Cursor::new(&bytecode.code),
@@ -51,9 +51,8 @@ impl<'a> BytecodeReader<'a> {
 
 /// Helper trait to read operation codes and operands conveniently.
 ///
-/// User does not need to call different methods when fetching operation codes or operands in
-/// different types. Just call `fetch()` (with type annotations usually) and let the compiler
-/// handles it.
+/// User does not need to call different methods when fetching operation codes or operands in different types. Just
+/// call `fetch()` (with type annotations usually) and let the compiler handles it.
 pub trait Fetch<T> {
     fn fetch(&mut self) -> T;
 }

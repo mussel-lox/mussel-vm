@@ -21,8 +21,15 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn as_boolean(&self) -> bool {
+    pub fn unbox(&self) -> &Self {
         match self {
+            Value::Upvalue(u) => u.deref(),
+            _ => self,
+        }
+    }
+
+    pub fn as_boolean(&self) -> bool {
+        match self.unbox() {
             Value::Boolean(b) => *b,
             Value::Nil => false,
             _ => true,
@@ -32,7 +39,7 @@ impl Value {
 
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
+        match (self.unbox(), other.unbox()) {
             (Value::Number(n1), Value::Number(n2)) => (n1 - n2).abs() < f64::EPSILON,
             (Value::Boolean(b1), Value::Boolean(b2)) => b1 == b2,
             (Value::Nil, Value::Nil) => true,
@@ -49,7 +56,6 @@ impl PartialEq for Value {
                 f1.position == f2.position && f1.arity == f2.arity
             }
             (Value::Closure(c1), Value::Closure(c2)) => c1 == c2,
-            (Value::Upvalue(u1), Value::Upvalue(u2)) => u1 == u2,
             _ => false,
         }
     }

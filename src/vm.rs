@@ -21,9 +21,8 @@ struct CallFrame {
 
 /// The Mussel VM.
 ///
-/// A virtual machine stores program states and executes bytecode instructions. As a stack
-/// machine, Mussel VM maintains a stack data structure, and stores local variable and does
-/// expression evaluation on it.
+/// A virtual machine stores program states and executes bytecode instructions. As a stack machine, Mussel VM
+/// maintains a stack data structure, and stores local variable and does expression evaluation on it.
 pub struct VirtualMachine {
     globals: Vec<Value>,
     stack: Stack<Value, LOCALS_CAPACITY>,
@@ -64,15 +63,18 @@ impl VirtualMachine {
         let mut reader = BytecodeReader::new(bytecode);
         macro_rules! arithmetic {
             ($operator: tt as $variant: ident) => {{
-                // SAFETY: The arithmetic operations can only be applied to numbers. When the
-                // operands are reference types, a panic will happen and the VM process will be
-                // terminated, leaving the GC behavior unimportant. Thus, we don't need to keep
-                // the values on stack before evaluation.
-                let right = self.stack.pop();
-                let left = self.stack.pop();
+                // SAFETY: Theoretically, arithmetic operations can only be applied to numbers. However, since we've
+                // introduced upvalues (which is a boxed value) to implement closure feature, we'll have to leave the
+                // operands on the stack before we evaluate them. Otherwise, the upvalue may be collected by GC and
+                // cause invalid deferencing.
+                let right = self.stack.peek(0).unbox();
+                let left = self.stack.peek(1).unbox();
                 match (left, right) {
                     (Value::Number(left), Value::Number(right)) => {
-                        self.stack.push(Value::$variant(left $operator right));
+                        let result = Value::$variant(*left $operator *right);
+                        self.stack.pop();
+                        self.stack.pop();
+                        self.stack.push(result);
                     }
                     _ => panic!(
                         "arithmetic operator `{}` can only be applied to numbers",
@@ -105,29 +107,31 @@ impl VirtualMachine {
                     self.stack.push(Value::FunctionPointer(fun));
                 }
 
-                // SAFETY: Negate operation can only be applied on numbers. When the operand is
-                // of reference type, a panic will happen and the VM will soon be terminated,
-                // leaving the GC behavior unimportant. Thus, we don't have to keep the operand
-                // on stack before evaluation.
-                OperationCode::Negate => match self.stack.pop() {
-                    Value::Number(n) => self.stack.push(Value::Number(-n)),
-                    _ => panic!("negate operator `-` can only be applied to numbers"),
-                },
+                OperationCode::Negate => {
+                    // SAFETY: Theoretically, negate operation can only be applied to numbers. However, upvalues are
+                    // introduced to implement closure feature, so we'll need to keep them on stack before we
+                    // evaluate them.
+                    let value = match self.stack.top().unbox() {
+                        Value::Number(n) => *n,
+                        _ => panic!("negate operator `-` can only be applied to numbers"),
+                    };
+                    self.stack.pop();
+                    self.stack.push(Value::Number(-value));
+                }
                 OperationCode::Not => {
-                    // SAFETY: Not operation indeed can be applied to all value types, including
-                    // the reference types. However, whether the converted value true or false
-                    // is irrelevant to the validity of the reference, and no dereferencing is
-                    // performed. Thus, the value doesn't need to be on stack before evaluation.
-                    let boolean: bool = self.stack.pop().as_boolean();
-                    self.stack.push(Value::Boolean(boolean));
+                    // Logical not operator can be applied to all types without panicking. The `as_boolean` does
+                    // automatic unboxing for us, and we just need to keep the value on stack.
+                    let value = self.stack.top().as_boolean();
+                    self.stack.pop();
+                    self.stack.push(Value::Boolean(!value));
                 }
 
                 OperationCode::Add => {
                     // SAFETY: Add operation can be applied to numbers or strings, and the
                     // latter is a reference type. We'll have to keep the reference values on
                     // stack before evaluation since we cannot know when the GC will execute.
-                    let right = self.stack.peek(0);
-                    let left = self.stack.peek(1);
+                    let right = self.stack.peek(0).unbox();
+                    let left = self.stack.peek(1).unbox();
                     match (left, right) {
                         (Value::Number(left), Value::Number(right)) => {
                             let sum = Value::Number(left + right);
@@ -255,7 +259,7 @@ impl VirtualMachine {
                     self.frame = self.stack.len() as LocalOffset - frame_offset;
                     reader.seek(position as usize);
                 }
-                OperationCode::Invoke => match self.stack.top() {
+                OperationCode::Invoke => match self.stack.top().unbox() {
                     Value::FunctionPointer(f) => {
                         // SAFETY: We get the important part of the function pointer out first,
                         // and pops it out of the stack. It can be GC-ed since we have already
