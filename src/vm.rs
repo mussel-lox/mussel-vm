@@ -57,8 +57,8 @@ impl VirtualMachine {
 
     /// Execute the bytecode.
     ///
-    /// Note that the VM is not reset here, since there may be some needs to execute a piece of
-    /// bytecode on some existing program states.
+    /// Note that the VM is not reset here, since there may be some needs to execute a piece of bytecode on some
+    /// existing program states.
     pub fn interpret(&mut self, bytecode: &Bytecode) {
         let mut reader = BytecodeReader::new(bytecode);
         macro_rules! arithmetic {
@@ -127,9 +127,9 @@ impl VirtualMachine {
                 }
 
                 OperationCode::Add => {
-                    // SAFETY: Add operation can be applied to numbers or strings, and the
-                    // latter is a reference type. We'll have to keep the reference values on
-                    // stack before evaluation since we cannot know when the GC will execute.
+                    // SAFETY: Add operation can be applied to numbers or strings, and the latter is a reference type
+                    // . We'll have to keep the reference values on stack before evaluation since we cannot know when
+                    // the GC will execute.
                     let right = self.stack.peek(0).unbox();
                     let left = self.stack.peek(1).unbox();
                     match (left, right) {
@@ -153,9 +153,11 @@ impl VirtualMachine {
                 OperationCode::Divide => arithmetic!(/ as Number),
 
                 OperationCode::Equal => {
-                    // SAFETY: Equal operation can be applied to each kind of values, and
-                    // there's reference types. We'll have to keep the reference values on stack
-                    // before evaluation since we cannot know when the GC will execute.
+                    // SAFETY: Equal operation can be applied to each kind of values, and there's reference types.
+                    // We'll have to keep the reference values on stack before evaluation since we cannot know when
+                    // the GC will execute.
+                    //
+                    // The overloaded [`PartialEq`] automatically handles unboxing for us.
                     let right = self.stack.peek(0);
                     let left = self.stack.peek(1);
                     let equal = Value::Boolean(left == right);
@@ -168,7 +170,13 @@ impl VirtualMachine {
 
                 OperationCode::SetGlobal => {
                     let index: GlobalIndex = reader.fetch();
-                    self.globals[index as usize] = self.stack.top().clone();
+                    let value = self.stack.top().clone();
+                    let target = &mut self.globals[index as usize];
+                    if let Value::Upvalue(u) = target {
+                        **u = value;
+                    } else {
+                        *target = value;
+                    }
                 }
                 OperationCode::GetGlobal => {
                     let index: GlobalIndex = reader.fetch();
@@ -182,11 +190,16 @@ impl VirtualMachine {
                 }
                 OperationCode::SetLocal => {
                     let offset: LocalOffset = reader.fetch();
-                    self.stack[(self.frame + offset) as usize] = self.stack.top().clone();
+                    let value = self.stack.top().clone();
+                    let target = &mut self.stack[(self.frame + offset) as usize];
+                    if let Value::Upvalue(u) = target {
+                        **u = value
+                    } else {
+                        *target = value
+                    }
                 }
 
-                // No SAFETY here because the Pop operation means to pop a value out of
-                // stack directly.
+                // No SAFETY here because the Pop operation means to pop a value out of stack directly.
                 OperationCode::Pop => drop(self.stack.pop()),
 
                 OperationCode::Closure => {
@@ -207,6 +220,7 @@ impl VirtualMachine {
                         _ => panic!("trying to capture value without closure at the stack top"),
                     };
 
+                    // The only place that creates an upvalue. There will never be a second-order upvalue.
                     if let Value::Upvalue(upvalue) = value {
                         closure.upvalues.push(upvalue);
                     } else {
@@ -231,9 +245,8 @@ impl VirtualMachine {
                         None => panic!("trying to set upvalue outside a closure"),
                     };
                     let mut upvalue = closure.upvalues[offset as usize];
-                    let value = self.stack.top().clone();
+                    let value = self.stack.top().unbox().clone();
                     *upvalue = value;
-                    self.stack.pop();
                 }
 
                 OperationCode::JumpIfFalse => {
@@ -261,9 +274,8 @@ impl VirtualMachine {
                 }
                 OperationCode::Invoke => match self.stack.top().unbox() {
                     Value::FunctionPointer(f) => {
-                        // SAFETY: We get the important part of the function pointer out first,
-                        // and pops it out of the stack. It can be GC-ed since we have already
-                        // known where to call.
+                        // SAFETY: We get the important part of the function pointer out first, and pops it out of
+                        // the stack. It can be GC-ed since we have already known where to call.
                         let position = f.position;
                         let frame_offset = f.arity;
                         self.stack.pop();
@@ -278,9 +290,8 @@ impl VirtualMachine {
                         reader.seek(position as usize);
                     }
                     Value::Closure(c) => {
-                        // SAFETY: We get the important part of the function pointer out first,
-                        // and pops it out of the stack. It can be GC-ed since we have already
-                        // known where to call.
+                        // SAFETY: We get the important part of the function pointer out first, and pops it out of
+                        // the stack. It can be GC-ed since we have already known where to call.
                         let position = c.position;
                         let frame_offset = c.arity;
                         let closure = *c;
@@ -300,9 +311,9 @@ impl VirtualMachine {
                 },
                 OperationCode::Return => {
                     if let Some(last_frame) = self.callstack.pop() {
-                        // SAFETY: We don't actually pop the top element out of stack, which may
-                        // cause GC bugs. We just clone it and put it onto the position of the
-                        // return value, and clears all the other locals.
+                        // SAFETY: We don't actually pop the top element out of stack, which may cause GC bugs. We
+                        // just clone it and put it onto the position of the return value, and clears all the other
+                        // locals.
                         self.stack[self.frame as usize] = self.stack.top().clone();
                         while self.stack.len() > (self.frame + 1) as usize {
                             self.stack.pop();
@@ -316,8 +327,8 @@ impl VirtualMachine {
                 }
 
                 OperationCode::Print => {
-                    // SAFETY: Print can be applied on reference types, and thus we must keep
-                    // them on stack before printing to prevent GC to collect them.
+                    // SAFETY: Print can be applied on reference types, and thus we must keep them on stack before
+                    // printing to prevent GC to collect them.
                     println!("{}", self.stack.top());
                     self.stack.pop();
                 }
