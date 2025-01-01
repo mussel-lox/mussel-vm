@@ -170,7 +170,7 @@ impl VirtualMachine {
 
                 OperationCode::SetGlobal => {
                     let index: GlobalIndex = reader.fetch();
-                    let value = self.stack.top().clone();
+                    let value = self.stack.top().unbox().clone();
                     let target = &mut self.globals[index as usize];
                     if let Value::Upvalue(u) = target {
                         **u = value;
@@ -190,7 +190,7 @@ impl VirtualMachine {
                 }
                 OperationCode::SetLocal => {
                     let offset: LocalOffset = reader.fetch();
-                    let value = self.stack.top().clone();
+                    let value = self.stack.top().unbox().clone();
                     let target = &mut self.stack[(self.frame + offset) as usize];
                     if let Value::Upvalue(u) = target {
                         **u = value
