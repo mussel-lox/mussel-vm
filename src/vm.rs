@@ -291,12 +291,8 @@ impl VirtualMachine {
                         reader.seek(position as usize);
                     }
                     Value::Closure(c) => {
-                        // SAFETY: We get the important part of the function pointer out first, and pops it out of
-                        // the stack. It can be GC-ed since we have already known where to call.
                         let position = c.position;
                         let frame_offset = c.arity;
-                        let closure = *c;
-                        self.stack.pop();
 
                         let last_frame = CallFrame {
                             position: reader.position() as CallPosition,
@@ -305,7 +301,9 @@ impl VirtualMachine {
                         };
                         self.callstack.push(last_frame);
                         self.frame = self.stack.len() as LocalOffset - frame_offset;
-                        self.closure = Some(closure);
+                        self.closure = Some(*c);
+                        self.stack.pop(); // We need to put the closure inside callstack before we pop it from the
+                                          // stack.
                         reader.seek(position as usize);
                     }
                     _ => panic!("object is not callable"),
