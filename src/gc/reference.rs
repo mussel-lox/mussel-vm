@@ -1,13 +1,13 @@
 use std::{
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-    ptr,
-    ptr::NonNull,
+	fmt::Debug,
+	ops::{Deref, DerefMut},
+	ptr,
+	ptr::NonNull,
 };
 
 use crate::{
-    gc::{Closure, FunctionPointer},
-    value::Value,
+	gc::{Closure, FunctionPointer},
+	value::Value,
 };
 
 /// Helper trait to limit a generic type parameter to a range of GC allowed allocation types.
@@ -25,8 +25,8 @@ pub(super) trait AllowedAllocationType {}
 #[repr(C)]
 #[derive(Debug)]
 struct RawAllocation<T> {
-    kind: AllocationKind,
-    value: T,
+	kind: AllocationKind,
+	value: T,
 }
 
 /// A pointer to a chunk of GC allocation.
@@ -40,62 +40,62 @@ struct RawAllocation<T> {
 pub struct Reference<T>(NonNull<RawAllocation<T>>);
 
 impl<T> Reference<T> {
-    /// Allocate a chunk of memory, returning its reference.
-    ///
-    /// A helper trait [`AllowedAllocationType`] is applied to limit the value type [`T`] in a valid range. However.
-    /// this function is still marked with `unsafe` because the other parts of code might get the [`AllocationKind`]
-    /// wrong. Check `unsafe` code carefully!
-    #[allow(private_bounds)]
-    #[allow(private_interfaces)]
-    pub unsafe fn spawn(kind: AllocationKind, value: T) -> Self
-    where
-        T: AllowedAllocationType,
-    {
-        Self(NonNull::new_unchecked(Box::into_raw(Box::new(RawAllocation { kind, value }))).cast())
-    }
+	/// Allocate a chunk of memory, returning its reference.
+	///
+	/// A helper trait [`AllowedAllocationType`] is applied to limit the value type [`T`] in a valid range. However.
+	/// this function is still marked with `unsafe` because the other parts of code might get the [`AllocationKind`]
+	/// wrong. Check `unsafe` code carefully!
+	#[allow(private_bounds)]
+	#[allow(private_interfaces)]
+	pub unsafe fn spawn(kind: AllocationKind, value: T) -> Self
+	where
+		T: AllowedAllocationType,
+	{
+		Self(NonNull::new_unchecked(Box::into_raw(Box::new(RawAllocation { kind, value }))).cast())
+	}
 
-    /// Cast a reference from type [`T`] to type [`U`].
-    ///
-    /// This is extremely unsafe since we cannot ensure if the casting is correct.
-    pub unsafe fn cast<U>(self) -> Reference<U> {
-        Reference(self.0.cast())
-    }
+	/// Cast a reference from type [`T`] to type [`U`].
+	///
+	/// This is extremely unsafe since we cannot ensure if the casting is correct.
+	pub unsafe fn cast<U>(self) -> Reference<U> {
+		Reference(self.0.cast())
+	}
 
-    /// Returns the [`AllocationKind`] of the reference.
-    ///
-    /// This operation is theoretically safe, since the `repr(C)` is applied and the layout except [`T`] of
-    /// [`RawAllocation`] should keep the same: we can safely get the allocation type.
-    pub fn kind(&self) -> AllocationKind {
-        unsafe { self.0.as_ref().kind }
-    }
+	/// Returns the [`AllocationKind`] of the reference.
+	///
+	/// This operation is theoretically safe, since the `repr(C)` is applied and the layout except [`T`] of
+	/// [`RawAllocation`] should keep the same: we can safely get the allocation type.
+	pub fn kind(&self) -> AllocationKind {
+		unsafe { self.0.as_ref().kind }
+	}
 }
 
 impl<T> Deref for Reference<T> {
-    type Target = T;
+	type Target = T;
 
-    fn deref(&self) -> &Self::Target {
-        unsafe { &self.0.as_ref().value }
-    }
+	fn deref(&self) -> &Self::Target {
+		unsafe { &self.0.as_ref().value }
+	}
 }
 
 impl<T> DerefMut for Reference<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut self.0.as_mut().value }
-    }
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		unsafe { &mut self.0.as_mut().value }
+	}
 }
 
 impl<T> Clone for Reference<T> {
-    fn clone(&self) -> Self {
-        Self(self.0)
-    }
+	fn clone(&self) -> Self {
+		Self(self.0)
+	}
 }
 
 impl<T> Copy for Reference<T> {}
 
 impl<T, U> PartialEq<Reference<U>> for Reference<T> {
-    fn eq(&self, other: &Reference<U>) -> bool {
-        ptr::addr_eq(self.0.as_ptr(), other.0.as_ptr())
-    }
+	fn eq(&self, other: &Reference<U>) -> bool {
+		ptr::addr_eq(self.0.as_ptr(), other.0.as_ptr())
+	}
 }
 
 impl<T> Eq for Reference<T> {}
@@ -106,11 +106,11 @@ impl<T> Eq for Reference<T> {}
 /// The principle is simple: we just check the metadata (i.e. [`AllocationKind`]) in the [`RawAllocation`], and
 /// returns the reference if matches.
 pub trait Downcast<T> {
-    /// Returns an immutable reference of [`T`] if the type matches, [`None`] is returned otherwise.
-    fn downcast(&self) -> Option<&T>;
+	/// Returns an immutable reference of [`T`] if the type matches, [`None`] is returned otherwise.
+	fn downcast(&self) -> Option<&T>;
 
-    /// Returns a mutable reference of [`T`] if the type matches, [`None`] is returned otherwise.
-    fn downcast_mut(&mut self) -> Option<&mut T>;
+	/// Returns a mutable reference of [`T`] if the type matches, [`None`] is returned otherwise.
+	fn downcast_mut(&mut self) -> Option<&mut T>;
 }
 
 /// This is the magic part: since there exist a lot of duplicate code segment, we just take advantage of the macro to
@@ -119,68 +119,68 @@ pub trait Downcast<T> {
 /// Moreover, because of the exhaustibility of allowed allocations types, we can ensure the type safety by doing so
 /// -- we don't provide corresponding functions for other types.
 macro_rules! register_allowed_types {
-    ($($variant: ident => $t: ty); * $(;)?) => {
-        /// The metadata to recognize the actual type of an allocation.
-        #[derive(Debug, Clone, Copy)]
-        pub enum AllocationKind {
-            $($variant), *
-        }
+	($($variant: ident => $t: ty); * $(;)?) => {
+		/// The metadata to recognize the actual type of an allocation.
+		#[derive(Debug, Clone, Copy)]
+		pub enum AllocationKind {
+			$($variant), *
+		}
 
-        $(
-        impl AllowedAllocationType for $t {}
+		$(
+		impl AllowedAllocationType for $t {}
 
-        impl Downcast<$t> for Reference<()> {
-            fn downcast(&self) -> Option<&$t> {
-                match self.kind() {
-                    AllocationKind::$variant => {
-                        let reference = unsafe { self.cast::<$t>() };
-                        Some(unsafe { &reference.0.as_ref().value })
-                    }
-                    _ => None
-                }
-            }
+		impl Downcast<$t> for Reference<()> {
+			fn downcast(&self) -> Option<&$t> {
+				match self.kind() {
+					AllocationKind::$variant => {
+						let reference = unsafe { self.cast::<$t>() };
+						Some(unsafe { &reference.0.as_ref().value })
+					}
+					_ => None
+				}
+			}
 
-            fn downcast_mut(&mut self) -> Option<&mut $t> {
-                match self.kind() {
-                    AllocationKind::$variant => {
-                        let mut reference = unsafe { self.cast::<$t>() };
-                        Some(unsafe { &mut reference.0.as_mut().value })
-                    }
-                    _ => None
-                }
-            }
-        }
-        )*
+			fn downcast_mut(&mut self) -> Option<&mut $t> {
+				match self.kind() {
+					AllocationKind::$variant => {
+						let mut reference = unsafe { self.cast::<$t>() };
+						Some(unsafe { &mut reference.0.as_mut().value })
+					}
+					_ => None
+				}
+			}
+		}
+		)*
 
-        impl Reference<()> {
-            /// Finalize a reference.
-            ///
-            /// We cannot rely on RAII pattern or borrow checker to clean up the resource, the GC algorithm is
-            /// against that. Instead, the GC will analyze the reachability of every allocation, and finalize them
-            /// manually at the right time.
-            ///
-            /// This function is unsafe because, if we've written the wrong algorithm, multiple dropping of an
-            /// allocation is possible. And `unsafe` keyword is of this use: the marked code should be checked very
-            /// carefully.
-            ///
-            /// This function is only implemented on `Reference<()>`, because it's the type adopted by GC. Any other
-            /// parts of the program should not finalize any single reference.
-            pub unsafe fn finalize(&mut self) {
-                match self.kind() {
-                    $(
-                    AllocationKind::$variant => {
-                        drop(Box::from_raw(self.cast::<$t>().0.as_mut()))
-                    }
-                    )*
-                }
-            }
-        }
-    };
+		impl Reference<()> {
+			/// Finalize a reference.
+			///
+			/// We cannot rely on RAII pattern or borrow checker to clean up the resource, the GC algorithm is
+			/// against that. Instead, the GC will analyze the reachability of every allocation, and finalize them
+			/// manually at the right time.
+			///
+			/// This function is unsafe because, if we've written the wrong algorithm, multiple dropping of an
+			/// allocation is possible. And `unsafe` keyword is of this use: the marked code should be checked very
+			/// carefully.
+			///
+			/// This function is only implemented on `Reference<()>`, because it's the type adopted by GC. Any other
+			/// parts of the program should not finalize any single reference.
+			pub unsafe fn finalize(&mut self) {
+				match self.kind() {
+					$(
+					AllocationKind::$variant => {
+						drop(Box::from_raw(self.cast::<$t>().0.as_mut()))
+					}
+					)*
+				}
+			}
+		}
+	};
 }
 
 register_allowed_types! {
-    String => String;
-    Function => FunctionPointer;
-    Closure => Closure;
-    Upvalue => Value;
+	String => String;
+	Function => FunctionPointer;
+	Closure => Closure;
+	Upvalue => Value;
 }
