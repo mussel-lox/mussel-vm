@@ -299,11 +299,12 @@ impl VirtualMachine {
 							frame: self.frame,
 							closure: mem::replace(&mut self.closure, None),
 						};
-						self.callstack.push(last_frame);
-						self.frame = self.stack.len() as LocalOffset - frame_offset;
 						self.closure = Some(*c);
 						self.stack.pop(); // We need to put the closure inside callstack before we pop it from the
 						// stack.
+
+						self.callstack.push(last_frame);
+						self.frame = self.stack.len() as LocalOffset - frame_offset;
 						reader.seek(position as usize);
 					}
 					_ => panic!("object is not callable"),
